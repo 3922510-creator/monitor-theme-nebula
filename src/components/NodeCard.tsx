@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  ArrowDown, ArrowUp, Clock, Cpu, HardDrive, Link2, MemoryStick, RefreshCw,
+  ArrowDown, ArrowUp, ArrowDownUp, Clock, Cpu, HardDrive, Link2, MemoryStick, RefreshCw,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -56,13 +56,13 @@ type PingPoint = {
 }
 type PingData = { ping: PingPoint[]; probes: Record<string, string>; loss?: Record<string, number> }
 
-/** Fetch recent ping history for one node. */
-function usePing(nodeId: number, enabled: boolean) {
+/** Fetch 24h ping history for hourly heatmap. */
+function usePing24h(nodeId: number, enabled: boolean) {
   const [data, setData] = useState<PingData | null>(null)
   useEffect(() => {
     if (!enabled) return
     let active = true
-    api<PingData>(`/nodes/${nodeId}/metrics?hours=1&points=60&series=ping`)
+    api<PingData>(`/nodes/${nodeId}/metrics?hours=24&points=288&series=ping`)
       .then((d) => { if (active) setData(d) })
       .catch(() => { if (active) setData({ ping: [], probes: {} }) })
     return () => { active = false }
@@ -70,59 +70,94 @@ function usePing(nodeId: number, enabled: boolean) {
   return data
 }
 
-function PingProbes({ node }: { node: Node }) {
-  const data = usePing(node.id, !!node.metrics)
+/** Latency → block color: <80 green, <150 yellow, <250 orange, else red. */
+function latColor(lat: number | null): string {
+  if (lat === null) return "bg-slate-200 dark:bg-slate-700"
+  if (lat < 80) return "bg-emerald-400"
+  if (lat < 150) return "bg-yellow-400"
+  if (lat < 250) return "bg-orange-400"
+  return "bg-red-400"
+}
 
-  const summary = useMemo(() => {
-    if (!data?.ping?.length) return null
-    // Average latest latency across all probes
-    const latencies = data.ping.filter((p) => p.latency !== null).map((p) => p.latency!)
-    const avgLat = latencies.length ? latencies.reduce((a, b) => a + b, 0) / latencies.length : 0
-    // Average loss across all probes
-    const lossVals = Object.values(data.loss ?? {})
-    const avgLoss = lossVals.length ? lossVals.reduce((a, b) => a + b, 0) / lossVals.length : 0
+/** Loss → block color: <1% green, <5% yellow, <10% orange, else red. */
+function lossColor(loss: number | null): string {
+  if (loss === null) return "bg-slate-200 dark:bg-slate-700"
+  if (loss < 1) return "bg-emerald-400"
+  if (loss < 5) return "bg-yellow-400"
+  if (loss < 10) return "bg-orange-400"
+  return "bg-red-400"
+}
 
-    // Build time-series: group by timestamp, average latency and availability
-    const byTs = new Map<number, { lat: number; n: number; avail: number; availN: number }>()
-    for (const p of data.ping) {
-      const row = byTs.get(p.ts) ?? { lat: 0, n: 0, avail: 0, availN: 0 }
-      if (p.latency !== null) { row.lat += p.latency; row.n++ }
-      row.avail += p.loss ?? 0
-      row.availN++
-      byTs.set(p.ts, row)
-    }
-    const sorted = [...byTs.entries()].sort(([a], [b]) => a - b)
-    const latSeries = sorted.map(([, r]) => (r.n > 0 ? r.lat / r.n : 0))
-    const availSeries = sorted.map(([, r]) => (r.availN > 0 ? 100 - r.avail / r.availN : 100))
+/** Build 24 hourly buckets from ping points. */
+function buildHourly(data: PingData | null) {
+  if (!data?.ping?.length) return null
+  const byHour = new Map<number, { lat: number; latN: number; loss: number; lossN: number }>()
+  for (const p of data.ping) {
+    const hour = Math.floor(p.ts / 3600) * 3600
+    const row = byHour.get(hour) ?? { lat: 0, latN: 0, loss: 0, lossN: 0 }
+    if (p.latency !== null) { row.lat += p.latency; row.latN++ }
+    row.loss += p.loss ?? 0
+    row.lossN++
+    byHour.set(hour, row)
+  }
+  const nowHour = Math.floor(Date.now() / 1000 / 3600) * 3600
+  const hours: { lat: number | null; loss: number | null }[] = []
+  for (let i = 23; i >= 0; i--) {
+    const row = byHour.get(nowHour - i * 3600)
+    hours.push({
+      lat: row && row.latN > 0 ? row.lat / row.latN : null,
+      loss: row && row.lossN > 0 ? row.loss / row.lossN : null,
+    })
+  }
+  const lats = hours.filter((h) => h.lat !== null).map((h) => h.lat!)
+  const losses = hours.filter((h) => h.loss !== null).map((h) => h.loss!)
+  const avgLat = lats.length ? lats.reduce((a, b) => a + b, 0) / lats.length : 0
+  const avgLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : 0
+  return { hours, avgLat, avgLoss }
+}
 
-    return { avgLat, avgLoss, latSeries, availSeries }
-  }, [data])
+/** 24-hour heatmap: latency row + loss row, matching detail page style. */
+function PingHeatmap({ node }: { node: Node }) {
+  const data = usePing24h(node.id, !!node.metrics)
+  const hourly = useMemo(() => buildHourly(data), [data])
 
-  if (!summary) return null
-  const maxLat = Math.max(...summary.latSeries, 1)
+  if (!hourly) return null
 
   return (
-    <div className="mt-3 space-y-1.5">
+    <div className="mt-3 space-y-2">
       <div className="grid grid-cols-2 gap-x-4">
         <div className="flex items-center gap-1.5">
-          <Clock className="size-3.5 text-muted-foreground" /
+          <Clock className="size-3.5 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">延迟</span>
-          <span className="tnum ml-auto text-sm font-bold text-emerald-600">
-            {Math.round(summary.avgLat)} ms
+          <span className={cn(
+            "tnum ml-auto text-sm font-bold",
+            hourly.avgLat < 80 ? "text-emerald-600" : hourly.avgLat < 150 ? "text-yellow-600" : hourly.avgLat < 250 ? "text-orange-600" : "text-red-600",
+          )}>
+            {Math.round(hourly.avgLat)} ms
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Link2 className="size-3.5 text-muted-foreground" /
-          <span className="text-xs text-muted-foreground">丢包率</span>
-          <span className="tnum ml-auto text-sm font-bold text-emerald-600">
-            {summary.avgLoss.toFixed(1)}%
+          <Link2 className="size-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">丢包</span>
+          <span className={cn(
+            "tnum ml-auto text-sm font-bold",
+            hourly.avgLoss < 1 ? "text-emerald-600" : hourly.avgLoss < 5 ? "text-yellow-600" : hourly.avgLoss < 10 ? "text-orange-600" : "text-red-600",
+          )}>
+            {hourly.avgLoss.toFixed(1)}%
           </span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-x-4">
-        <BlockSpark values={summary.latSeries} color="bg-yellow-400/80" max={maxLat} />
-        <BlockSpark values={summary.availSeries.map((a) => a >= 99 ? 100 : a)} color="bg-emerald-400/80" />
+      <div className="flex gap-[2px]">
+        {hourly.hours.map((h, i) => (
+          <div key={i} className={cn("h-2.5 flex-1 rounded-[1px]", latColor(h.lat))} />
+        ))}
       </div>
+      <div className="flex gap-[2px]">
+        {hourly.hours.map((h, i) => (
+          <div key={i} className={cn("h-2.5 flex-1 rounded-[1px]", lossColor(h.loss))} />
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground">最近24小时 · 每格1小时</p>
     </div>
   )
 }
@@ -134,6 +169,8 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
   const txHist = hist.map((h) => h.tx)
   const sparkMax = Math.max(...rxHist, ...txHist, 1)
 
+  const trafficPct = node.traffic_limit > 0 ? percent(monthUsage(node), node.traffic_limit) : null
+
   return (
     <Card
       onClick={onOpen}
@@ -142,7 +179,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
     >
-      {/* Header: status dot + node name + remark tag + expiry days */}
       <div className="flex items-start justify-between">
         <div className="flex min-w-0 items-center gap-2">
           <span
@@ -172,7 +208,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
         })()}
       </div>
 
-      {/* OS line */}
       <p className="mt-1 truncate text-xs text-muted-foreground">
         {node.os ? osName(node.os) : "等待首次上报"}
         {node.arch ? ` · ${node.arch}` : ""}
@@ -181,7 +216,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
 
       {deployed(node) ? (
         <>
-          {/* CPU / Memory / Disk / Load */}
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
             <Meter
               label={`CPU · ${node.cpu_cores} 核`}
@@ -210,7 +244,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             />
           </div>
 
-          {/* Throughput + sparkline */}
           <div className="mt-3 grid grid-cols-2 gap-x-4">
             <div>
               <div className="flex items-baseline gap-1.5">
@@ -242,20 +275,23 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             </div>
           </div>
 
-          {/* Traffic usage + uptime */}
-          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-            <span className="tnum">
-              {node.traffic_limit > 0
-                ? `${bytes(monthUsage(node))} / ${bytes(node.traffic_limit)}`
-                : `在线: ${m ? uptime(m.uptime) : "—"}`}
-            </span>
-            {node.traffic_limit > 0 && (
-              <span className="tnum">在线: {m ? uptime(m.uptime) : "—"}</span>
-            )}
-          </div>
+          {node.traffic_limit > 0 && (
+            <div className="mt-3">
+              <Meter
+                label="流量"
+                icon={<ArrowDownUp className="size-3" />}
+                pct={trafficPct}
+                foot={`${bytes(monthUsage(node))} / ${bytes(node.traffic_limit)}`}
+                color="bg-pink-400"
+              />
+            </div>
+          )}
 
-          {/* Ping probes */}
-          <PingProbes node={node} />
+          <p className="mt-2 text-xs text-muted-foreground tnum">
+            在线: {m ? uptime(m.uptime) : "—"}
+          </p>
+
+          <PingHeatmap node={node} />
         </>
       ) : (
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -266,7 +302,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
   )
 }
 
-/** Country badge (used by detail page). */
 export function Country({ node }: { node: Node }) {
   if (!node.country) return null
   return (
@@ -276,7 +311,6 @@ export function Country({ node }: { node: Node }) {
   )
 }
 
-/** Online/offline status badge (used by detail page). */
 export function Status({ node }: { node: Node }) {
   const down = node.last_seen ? Date.now() / 1000 - node.last_seen : 0
   const label = node.online
