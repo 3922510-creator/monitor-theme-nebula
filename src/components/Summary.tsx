@@ -11,7 +11,7 @@ function Tile({ icon: Icon, label, children }: {
   return (
     <Card className="gap-0 p-3">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="size-3.5 text-cyan-400" />
+        <Icon className="size-3.5 text-blue-500" />
         {label}
       </div>
       {children}
@@ -98,8 +98,8 @@ export function Summary({ nodes }: { nodes: Node[] }) {
         <div className="mt-auto pt-1">
           <Spark
             series={[
-              { values: speedHistory.map((s) => s.rx), className: "text-cyan-400" },
-              { values: speedHistory.map((s) => s.tx), className: "text-violet-400" },
+              { values: speedHistory.map((s) => s.rx), className: "text-blue-500" },
+              { values: speedHistory.map((s) => s.tx), className: "text-violet-500" },
             ]}
           />
         </div>

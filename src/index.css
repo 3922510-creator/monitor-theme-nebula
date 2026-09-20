@@ -1,5 +1,5 @@
-/* Nebula — neon theme tokens.
-   Palette: deep blue-black ground, cyan / violet / pink accents. */
+/* Nebula — clean light theme.
+   Palette: soft gray ground, white cards, blue / violet / orange accents. */
 @import "tailwindcss" source(none);
 @source "../index.html";
 @source "../src";
@@ -9,61 +9,61 @@
 
 :root {
   --radius: 0.75rem;
-  --background: #eef1f9;
-  --foreground: #13162b;
+  --background: #f4f5f9;
+  --foreground: #1e293b;
   --card: #ffffff;
-  --card-foreground: #13162b;
+  --card-foreground: #1e293b;
   --popover: #ffffff;
-  --popover-foreground: #13162b;
-  --primary: #0891b2;
+  --popover-foreground: #1e293b;
+  --primary: #3b82f6;
   --primary-foreground: #ffffff;
-  --secondary: #e7eaf6;
-  --secondary-foreground: #13162b;
-  --muted: #e7eaf6;
-  --muted-foreground: #5a6288;
-  --accent: #e7eaf6;
-  --accent-foreground: #13162b;
-  --destructive: #e11d48;
+  --secondary: #f1f3f9;
+  --secondary-foreground: #1e293b;
+  --muted: #f1f3f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f3f9;
+  --accent-foreground: #1e293b;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: rgba(99, 102, 241, 0.16);
-  --input: rgba(99, 102, 241, 0.22);
-  --ring: #0891b2;
-  --chart-1: #0891b2;
-  --chart-2: #7c3aed;
-  --chart-3: #db2777;
-  --chart-4: #059669;
-  --chart-5: #d97706;
-  --ok: #059669;
-  --warn: #d97706;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #3b82f6;
+  --chart-1: #3b82f6;
+  --chart-2: #8b5cf6;
+  --chart-3: #f97316;
+  --chart-4: #22c55e;
+  --chart-5: #eab308;
+  --ok: #22c55e;
+  --warn: #eab308;
 }
 
 .dark {
-  --background: #05060b;
-  --foreground: #e6e9ff;
-  --card: #0a0d17;
-  --card-foreground: #e6e9ff;
-  --popover: #0a0d17;
-  --popover-foreground: #e6e9ff;
-  --primary: #22d3ee;
-  --primary-foreground: #041216;
-  --secondary: #12162b;
-  --secondary-foreground: #e6e9ff;
-  --muted: #141830;
-  --muted-foreground: #8d95bd;
-  --accent: #141830;
-  --accent-foreground: #e6e9ff;
-  --destructive: #fb7185;
-  --destructive-foreground: #1c050a;
-  --border: rgba(139, 92, 246, 0.18);
-  --input: rgba(139, 92, 246, 0.22);
-  --ring: #22d3ee;
-  --chart-1: #22d3ee;
+  --background: #0f1117;
+  --foreground: #e2e8f0;
+  --card: #1a1d27;
+  --card-foreground: #e2e8f0;
+  --popover: #1a1d27;
+  --popover-foreground: #e2e8f0;
+  --primary: #60a5fa;
+  --primary-foreground: #0f1117;
+  --secondary: #252938;
+  --secondary-foreground: #e2e8f0;
+  --muted: #252938;
+  --muted-foreground: #94a3b8;
+  --accent: #252938;
+  --accent-foreground: #e2e8f0;
+  --destructive: #f87171;
+  --destructive-foreground: #0f1117;
+  --border: #2d3245;
+  --input: #2d3245;
+  --ring: #60a5fa;
+  --chart-1: #60a5fa;
   --chart-2: #a78bfa;
-  --chart-3: #f472b6;
-  --chart-4: #34d399;
-  --chart-5: #fbbf24;
-  --ok: #34d399;
-  --warn: #fbbf24;
+  --chart-3: #fb923c;
+  --chart-4: #4ade80;
+  --chart-5: #facc15;
+  --ok: #4ade80;
+  --warn: #facc15;
 }
 
 @theme inline {
@@ -104,14 +104,9 @@
   body { @apply bg-background text-foreground; }
 }
 
-/* Neon ambient glow behind everything */
+/* Subtle card shadow */
 body {
-  background:
-    radial-gradient(1100px 620px at 12% -12%, rgba(34, 211, 238, 0.08), transparent 62%),
-    radial-gradient(960px 560px at 88% -14%, rgba(167, 139, 250, 0.1), transparent 58%),
-    radial-gradient(820px 700px at 50% 122%, rgba(244, 114, 182, 0.06), transparent 60%),
-    var(--background);
-  background-attachment: fixed;
+  background: var(--background);
 }
 
 /* Tabular figures keep live numbers from shifting as they update. */

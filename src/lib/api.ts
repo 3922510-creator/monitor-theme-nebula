@@ -84,6 +84,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 const KEEP = 60
 export const speedHistory: { rx: number; tx: number }[] = []
 
+/** Per-node throughput history for the sparkline block on each card. */
+const KEEP_PER_NODE = 30
+export const nodeSpeedHistory = new Map<number, { rx: number; tx: number }[]>()
+
 function sample(nodes: Node[]) {
   const live = nodes.filter((n) => n.online && n.metrics)
   speedHistory.push({
@@ -91,6 +95,16 @@ function sample(nodes: Node[]) {
     tx: live.reduce((s, n) => s + n.metrics!.net_tx, 0),
   })
   if (speedHistory.length > KEEP) speedHistory.shift()
+
+  // Per-node samples for card sparklines
+  for (const n of live) {
+    const nm = n.metrics
+    if (!nm) continue
+    const hist = nodeSpeedHistory.get(n.id) ?? []
+    hist.push({ rx: nm.net_rx, tx: nm.net_tx })
+    if (hist.length > KEEP_PER_NODE) hist.shift()
+    nodeSpeedHistory.set(n.id, hist)
+  }
 }
 
 /** A malformed report must not remove every other node from the page. */
@@ -106,8 +120,7 @@ export function safeNodes(nodes: Node[]): Node[] {
 }
 
 /**
- * Live node list. Uses the WebSocket the hub pushes every two seconds, falling
- * back to polling if it cannot be established.
+ * Live node list. Uses the WebSocket the hub pushes every two seconds, falling back to polling if it cannot be established.
  */
 export function useNodes() {
   const [nodes, setNodes] = useState<Node[] | null>(null)

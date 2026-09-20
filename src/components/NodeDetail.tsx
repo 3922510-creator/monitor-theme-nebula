@@ -4,11 +4,15 @@ import {
   Area, AreaChart, Brush, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts"
+import {
+  ArrowDownUp, Cpu, HardDrive, MemoryStick, Server, Wallet,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Country, Status } from "@/components/NodeCard"
 import { api, type Node } from "@/lib/api"
+import { cn } from "@/lib/utils"
 import {
   axisBytes, axisTop, bytes, clockFor, quarters, cpuName, CYCLES, FOREVER, money, osName, rate, timeTicks,
 } from "@/lib/format"
@@ -38,7 +42,11 @@ const RANGES = [
   { hours: 168, label: "7 天" },
 ]
 
-const RANGES_FOR = { resources: RANGES, latency: RANGES.filter((r) => r.hours <= 24) }
+const RANGES_FOR = {
+  resources: RANGES,
+  latency: RANGES.filter((r) => r.hours <= 24),
+  availability: RANGES,
+}
 
 const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false }
 
@@ -46,18 +54,19 @@ const SERIES = { dot: false as const, strokeWidth: 1.5, isAnimationActive: false
 
 const Y_WIDTH = 68
 
-// Neon palette — cyan, violet, pink, green, amber.
+// Probe palette — pink / amber / cyan / violet / emerald, matching card sparklines.
 const PALETTE = [
-  { stroke: "var(--color-chart-1)", dash: undefined },
-  { stroke: "var(--color-chart-3)", dash: "6 3" },
-  { stroke: "var(--color-chart-2)", dash: "2 3" },
-  { stroke: "var(--color-chart-4)", dash: "10 4 2 4" },
-  { stroke: "var(--color-chart-5)", dash: "1 4" },
+  { stroke: "#ec4899", dash: undefined },
+  { stroke: "#ca8a04", dash: "6 3" },
+  { stroke: "#0891b2", dash: "2 3" },
+  { stroke: "#8b5cf6", dash: "10 4 2 4" },
+  { stroke: "#059669", dash: "1 4" },
 ]
 
 const TABS = [
   { key: "resources", label: "资源" },
   { key: "latency", label: "网络延迟" },
+  { key: "availability", label: "可用性" },
 ] as const
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -97,26 +106,28 @@ function despike(points: PingPoint[], window = 7, sigmas = 3): PingPoint[] {
   })
 }
 
-function Fact({ label, value }: { label: string; value?: string | number | null }) {
+function Fact({ label, value, icon: Icon }: { label: string; value?: string | number | null; icon?: typeof Server }) {
   if (value === null || value === undefined || value === "") return null
   return (
-    <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="truncate text-sm">{value}</dd>
+    <div className="rounded-lg border border-border bg-card/60 px-3 py-2.5">
+      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {Icon && <Icon className="size-3.5" />}
+        {label}
+      </dt>
+      <dd className="tnum mt-1 truncate text-sm font-medium">{value}</dd>
     </div>
   )
 }
 
 export function NodeDetail({ node }: { node: Node }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("resources")
-  const [ranges, setRanges] = useState({ resources: 6, latency: 6 })
+  const [ranges, setRanges] = useState({ resources: 6, latency: 6, availability: 24 })
   const hours = ranges[tab]
   const [smooth, setSmooth] = useState(false)
   const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
   const [data, setData] = useState<{ metrics: Point[]; ping: PingPoint[]; probes: Probes; loss?: Loss } | null>(null)
   const [failed, setFailed] = useState("")
   const [zoom, setZoom] = useState<[number, number] | null>(null)
-  const [chartTop, setChartTop] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -124,7 +135,7 @@ export function NodeDetail({ node }: { node: Node }) {
     setZoom(null)
     setFailed("")
     const points = Math.round(globalThis.innerWidth * (globalThis.devicePixelRatio || 1))
-    const series = tab === "latency" ? "ping" : "metrics"
+    const series = tab === "resources" ? "metrics" : "ping"
     api<{ metrics: Point[]; ping: PingPoint[]; probes: Probes; loss?: Loss }>(
       `/nodes/${node.id}/metrics?hours=${hours}&points=${points}&series=${series}`,
     )
@@ -199,7 +210,7 @@ export function NodeDetail({ node }: { node: Node }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <h2 className="truncate text-lg font-medium">{node.name}</h2>
         <Country node={node} />
         <Status node={node} />
@@ -210,22 +221,25 @@ export function NodeDetail({ node }: { node: Node }) {
         )}
       </div>
 
-      <dl className="grid gap-x-6 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
-        <Fact label="系统" value={[osName(node.os), node.kernel].filter(Boolean).join(" · ")} />
+      <dl className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <Fact label="系统" icon={Server} value={[osName(node.os), node.kernel].filter(Boolean).join(" · ")} />
         <Fact
           label="CPU"
+          icon={Cpu}
           value={node.cpu_name ? `${cpuName(node.cpu_name)} × ${node.cpu_cores}` : `${node.cpu_cores} 核`}
         />
-        <Fact label="内存 / 硬盘" value={`${bytes(node.mem_total)} / ${bytes(node.disk_total)}`} />
+        <Fact label="内存 / 硬盘" icon={MemoryStick} value={`${bytes(node.mem_total)} / ${bytes(node.disk_total)}`} />
         <Fact
           label="架构"
+          icon={HardDrive}
           value={[node.arch, node.virt !== "none" ? node.virt : "", m ? `${m.procs} 进程` : ""]
             .filter(Boolean)
             .join(" · ")}
         />
-        <Fact label="今日流量" value={`↓ ${bytes(node.day_rx)} · ↑ ${bytes(node.day_tx)}`} />
+        <Fact label="今日流量" icon={ArrowDownUp} value={`↓ ${bytes(node.day_rx)} · ↑ ${bytes(node.day_tx)}`} />
         <Fact
           label="续费"
+          icon={Wallet}
           value={[
             node.price > 0
               ? `${money(node.price, node.currency)} / ${CYCLES[node.billing_cycle] ?? node.billing_cycle}`
@@ -233,11 +247,10 @@ export function NodeDetail({ node }: { node: Node }) {
             node.expires_at ? `${node.expires_at} 到期` : FOREVER,
           ].join(" · ")}
         />
+        {node.remark && (
+          <Fact label="备注" icon={Server} value={node.remark} />
+        )}
       </dl>
-
-      {node.remark && (
-        <p className="rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-wrap">{node.remark}</p>
-      )}
 
       <div className="space-y-2 border-t border-violet-500/15 pt-4">
         <div className="flex gap-1">
@@ -281,17 +294,8 @@ export function NodeDetail({ node }: { node: Node }) {
         pingSeries.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">这段时间没有延迟数据</p>
         ) : (
-          <div
-            ref={(el) => {
-              if (el) setChartTop(el.getBoundingClientRect().top + scrollY)
-            }}
-            style={
-              chartTop
-                ? { height: `calc(100svh - ${Math.round(chartTop)}px - 1rem)` }
-                : undefined
-            }
-            className="flex min-h-72 flex-col gap-3">
-            <div className="min-h-0 w-full flex-1 text-muted-foreground">
+          <div className="flex flex-col gap-3">
+            <div className="h-72 w-full text-muted-foreground">
               {shownProbes.length === 0 ? (
                 <p className="py-8 text-center text-sm">没有选中任何探测</p>
               ) : (
@@ -391,6 +395,46 @@ export function NodeDetail({ node }: { node: Node }) {
             )}
           </div>
         )
+      ) : tab === "availability" ? (
+        pingSeries.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">这段时间没有可用性数据</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-card/50 p-4">
+              <div className="mb-3 text-sm font-medium">
+                可用性（{hours <= 24 ? hours + " 小时" : "7 天"}）
+              </div>
+              <div className="space-y-2.5">
+                {pingSeries.map((s) => {
+                  const avail = Math.max(0, 100 - s.loss)
+                  const color = avail >= 99 ? "bg-emerald-500" : avail >= 95 ? "bg-amber-500" : "bg-red-500"
+                  return (
+                    <div key={s.id} className="flex items-center gap-3">
+                      <span className="w-20 shrink-0 truncate text-xs text-muted-foreground">{s.name}</span>
+                      <div className="flex flex-1 gap-[2px]">
+                        {Array.from({ length: 40 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "h-2.5 flex-1 rounded-[2px]",
+                              i < Math.round(avail / 100 * 40) ? color : "bg-slate-200 dark:bg-slate-700",
+                            )}
+                          />
+                        ))}
+                      </div>
+                      <span className="tnum w-16 shrink-0 text-right text-sm font-semibold">
+                        {avail.toFixed(1)}%
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              可用性 = 100% - 丢包率。绿色 ≥ 99%，黄色 ≥ 95%，红色 &lt; 95%。
+            </p>
+          </div>
+        )
       ) : data.metrics.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">这段时间没有历史数据</p>
       ) : (
@@ -403,10 +447,10 @@ export function NodeDetail({ node }: { node: Node }) {
                 <YAxis domain={[0, tops.cpu]} ticks={quarters(tops.cpu)} unit="%" width={Y_WIDTH} {...AXIS} />
                 <Tooltip
                   labelFormatter={(ts) => new Date(Number(ts)).toLocaleString("zh-CN")}
-                  formatter={(v) => [`${Number(v).toFixed(1)}%`, "CPU"]}
+                  formatter={(v) => [`${Number(v).toFixed(1)}%", "CPU"]}
                   contentStyle={{ fontSize: 12 }}
                 />
-                <Area dataKey="cpu" stroke="var(--color-chart-1)" fill="var(--color-chart-1)" fillOpacity={0.15} {...SERIES} />
+                <Area dataKey="cpu" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} {...SERIES} />
               </AreaChart>
             </ResponsiveContainer>
           </Panel>
@@ -422,7 +466,7 @@ export function NodeDetail({ node }: { node: Node }) {
                   formatter={(v) => bytes(Number(v))}
                   contentStyle={{ fontSize: 12 }}
                 />
-                <Area dataKey="mem_used" name="内存" stroke="var(--color-chart-2)" fill="var(--color-chart-2)" fillOpacity={0.15} {...SERIES} />
+                <Area dataKey="mem_used" name="内存" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.15} {...SERIES} />
               </AreaChart>
             </ResponsiveContainer>
           </Panel>
@@ -438,8 +482,8 @@ export function NodeDetail({ node }: { node: Node }) {
                   formatter={(v) => rate(Number(v))}
                   contentStyle={{ fontSize: 12 }}
                 />
-                <Line dataKey="net_rx" name="下行" stroke="var(--color-ok)" {...SERIES} />
-                <Line dataKey="net_tx" name="上行" stroke="var(--color-chart-1)" {...SERIES} />
+                <Line dataKey="net_rx" name="下行" stroke="#22c55e" {...SERIES} />
+                <Line dataKey="net_tx" name="上行" stroke="#3b82f6" {...SERIES} />
               </LineChart>
             </ResponsiveContainer>
           </Panel>
@@ -455,7 +499,7 @@ export function NodeDetail({ node }: { node: Node }) {
                   formatter={(v) => bytes(Number(v))}
                   contentStyle={{ fontSize: 12 }}
                 />
-                <Area dataKey="disk_used" name="硬盘" stroke="var(--color-chart-2)" fill="var(--color-chart-2)" fillOpacity={0.15} {...SERIES} />
+                <Area dataKey="disk_used" name="硬盘" stroke="#f97316" fill="#f97316" fillOpacity={0.15} {...SERIES} />
               </AreaChart>
             </ResponsiveContainer>
           </Panel>
