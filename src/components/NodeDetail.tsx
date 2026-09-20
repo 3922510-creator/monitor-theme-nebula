@@ -5,7 +5,7 @@ import {
   Tooltip, XAxis, YAxis,
 } from "recharts"
 import {
-  ArrowDownUp, Cpu, HardDrive, MemoryStick, MessageSquare, Server, Wallet,
+  ArrowDownUp, Cpu, HardDrive, MemoryStick, Server, Wallet,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -115,27 +115,12 @@ function Fact({ label, value, icon: Icon }: { label: string; value?: string | nu
   )
 }
 
-/** Average latency text color. */
-function latText(lat: number): string {
-  if (lat < 80) return "text-emerald-600"
-  if (lat < 150) return "text-yellow-600"
-  if (lat < 250) return "text-orange-600"
-  return "text-red-600"
-}
-
-/** Average loss text color. */
-function lossText(loss: number): string {
-  if (loss < 1) return "text-emerald-600"
-  if (loss < 5) return "text-yellow-600"
-  if (loss < 10) return "text-orange-600"
-  return "text-red-600"
-}
-
 export function NodeDetail({ node }: { node: Node }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("resources")
   const [ranges, setRanges] = useState({ resources: 6, latency: 24 })
   const hours = ranges[tab]
   const [smooth, setSmooth] = useState(false)
+  const [breakLine, setBreakLine] = useState(false)
   const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
   const [data, setData] = useState<{ metrics: Point[]; ping: PingPoint[]; probes: Probes; loss?: Loss } | null>(null)
   const [failed, setFailed] = useState("")
@@ -226,6 +211,11 @@ export function NodeDetail({ node }: { node: Node }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="truncate text-lg font-medium">{node.name}</h2>
+        {node.remark && (
+          <span className="rounded-full bg-linear-to-r from-blue-50 to-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-600 dark:from-blue-950/50 dark:to-violet-950/50 dark:text-violet-400">
+            {node.remark}
+          </span>
+        )}
         <Country node={node} />
         <Status node={node} />
         {node.agent_version && (
@@ -261,9 +251,6 @@ export function NodeDetail({ node }: { node: Node }) {
             node.expires_at ? `${node.expires_at} 到期` : FOREVER,
           ].join(" · ")}
         />
-        {node.remark && (
-          <Fact label="备注" icon={MessageSquare} value={node.remark} />
-        )}
       </dl>
 
       <div className="space-y-2 border-t border-violet-500/15 pt-4">
@@ -287,15 +274,26 @@ export function NodeDetail({ node }: { node: Node }) {
             ))}
           </div>
           {tab === "latency" && (
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={smooth}
-                onChange={(e) => setSmooth(e.target.checked)}
-                className="accent-foreground"
-              />
-              削峰
-            </label>
+            <>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={smooth}
+                  onChange={(e) => setSmooth(e.target.checked)}
+                  className="accent-foreground"
+                />
+                削峰平滑
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={breakLine}
+                  onChange={(e) => setBreakLine(e.target.checked)}
+                  className="accent-foreground"
+                />
+                断点连线
+              </label>
+            </>
           )}
         </div>
       </div>
@@ -309,30 +307,6 @@ export function NodeDetail({ node }: { node: Node }) {
           <p className="py-8 text-center text-sm text-muted-foreground">这段时间没有延迟数据</p>
         ) : (
           <div className="space-y-4">
-            {/* Per-probe summary row: name + latency + loss */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {pingSeries.map((s) => (
-                <div key={s.id}>
-                  <div
-                    className="text-sm font-medium"
-                    style={{ color: style(s.id).stroke }}
-                  >
-                    {s.name}
-                  </div>
-                  <div className="tnum mt-1 text-2xl font-bold tracking-tight">
-                    <span className={latText(s.avgLat)}>{s.avgLat.toFixed(2)}</span>
-                    <span className="ml-1 text-sm font-normal text-muted-foreground">ms</span>
-                  </div>
-                  <div className="tnum mt-1 text-xs text-muted-foreground">
-                    <span className={lossText(s.loss)}>{s.loss.toFixed(2)}%</span> 丢包
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Chart title */}
-            <h3 className="text-lg font-semibold">TCP 建连延迟</h3>
-
             {/* Time series chart */}
             <div className="h-72 w-full text-muted-foreground">
               {shownProbes.length === 0 ? (
@@ -368,7 +342,7 @@ export function NodeDetail({ node }: { node: Node }) {
                           isAnimationActive={false}
                           tooltipType="none"
                           legendType="none"
-                          connectNulls
+                          connectNulls={!breakLine}
                         />
                       ))}
                     {shownProbes.map((s) => (
@@ -379,13 +353,13 @@ export function NodeDetail({ node }: { node: Node }) {
                         stroke={style(s.id).stroke}
                         strokeDasharray={style(s.id).dash}
                         {...SERIES}
-                        connectNulls
+                        connectNulls={!breakLine}
                       />
                     ))}
                     <Brush
                       dataKey="ts"
-                      height={22}
-                      travellerWidth={8}
+                      height={28}
+                      travellerWidth={10}
                       tickFormatter={clockFor(hours)}
                       className="fill-muted"
                       stroke="var(--color-muted-foreground)"
