@@ -166,7 +166,7 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               "tnum shrink-0 text-xs font-medium",
               days < 0 ? "text-red-500" : days <= 30 ? "text-amber-500" : "text-muted-foreground",
             )}>
-              {days < 0 ? `过期${-days}天` : `${days}天`}
+              {days < 0 ? `已过期${-days}天` : `${days}天后到期`}
             </span>
           )
         })()}

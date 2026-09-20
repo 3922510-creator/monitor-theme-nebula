@@ -212,6 +212,11 @@ export function NodeDetail({ node }: { node: Node }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="truncate text-lg font-medium">{node.name}</h2>
+        {node.remark && (
+          <span className="rounded-full bg-linear-to-r from-blue-50 to-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-600 dark:from-blue-950/50 dark:to-violet-950/50 dark:text-violet-400">
+            {node.remark}
+          </span>
+        )}
         <Country node={node} />
         <Status node={node} />
         {node.agent_version && (
@@ -247,9 +252,6 @@ export function NodeDetail({ node }: { node: Node }) {
             node.expires_at ? `${node.expires_at} 到期` : FOREVER,
           ].join(" · ")}
         />
-        {node.remark && (
-          <Fact label="备注" icon={Server} value={node.remark} />
-        )}
       </dl>
 
       <div className="space-y-2 border-t border-violet-500/15 pt-4">
@@ -447,7 +449,7 @@ export function NodeDetail({ node }: { node: Node }) {
                 <YAxis domain={[0, tops.cpu]} ticks={quarters(tops.cpu)} unit="%" width={Y_WIDTH} {...AXIS} />
                 <Tooltip
                   labelFormatter={(ts) => new Date(Number(ts)).toLocaleString("zh-CN")}
-                  formatter={(v) => [`${Number(v).toFixed(1)}%", "CPU"]}
+                  formatter={(v) => [`${Number(v).toFixed(1)}%`, "CPU"]}
                   contentStyle={{ fontSize: 12 }}
                 />
                 <Area dataKey="cpu" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} {...SERIES} />
