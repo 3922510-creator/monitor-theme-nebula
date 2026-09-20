@@ -19,7 +19,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: tar czf theme.tar.gz dist theme.json preview.png
+      # USTAR format: monitor's tar reader rejects GNU tar's default pax
+      # global header entries. No preview.png shipped yet, so only pack dist + theme.json.
+      - run: tar --format=ustar -czf theme.tar.gz dist theme.json
       - run: sha256sum theme.tar.gz | cut -d' ' -f1 | tee theme.tar.gz.sha256
       - if: startsWith(github.ref, 'refs/tags/')
         run: gh release create "$GITHUB_REF_NAME" theme.tar.gz theme.tar.gz.sha256 --generate-notes --repo "$GITHUB_REPOSITORY"
