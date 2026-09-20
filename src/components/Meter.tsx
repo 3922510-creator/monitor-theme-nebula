@@ -47,7 +47,9 @@ export function Meter({ label, pct, foot, empty = "—", color = "bg-blue-400", 
           ))}
         </div>
       )}
-      {foot && noBar && null}
+      {foot && pct !== null && (
+        <div className="tnum mt-1 text-right text-[10px] text-muted-foreground">{foot}</div>
+      )}
     </div>
   )
 }
