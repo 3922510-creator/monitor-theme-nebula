@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react"
-import { Moon, Sun, Wrench } from "lucide-react"
+import { Moon, Sun } from "lucide-react"
 
 import { NodeCard } from "@/components/NodeCard"
 import { Summary } from "@/components/Summary"
@@ -103,11 +103,6 @@ export default function App() {
             {me.site_name || "Nebula"}
           </button>
           <div className="flex-1" />
-          <Button variant="ghost" size="sm" asChild>
-            <a href="/admin/">
-              <Wrench /> {me.authed ? "进入后台" : "登录"}
-            </a>
-          </Button>
           <Button variant="ghost" size="icon" onClick={toggleTheme} title="切换主题">
             {dark ? <Sun /> : <Moon />}
           </Button>
