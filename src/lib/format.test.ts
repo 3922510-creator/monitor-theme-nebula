@@ -10,7 +10,7 @@ function eq(got: unknown, want: unknown, what: string) {
 }
 
 eq(bytes(0), "0 B", "bytes(0)")
-eq(bytes(0.5), "0 B", "bytes(0.5) 不能落到 UNITS[-1]")
+eq(bytes(0.5), "0 B", "bytes(0.5)")
 eq(bytes(-1), "0 B", "bytes(负数)")
 eq(bytes(1023), "1023 B", "bytes 在 B 档不带小数")
 eq(bytes(1024), "1.00 KB", "bytes(1 KiB)")
@@ -28,8 +28,8 @@ eq(axisTop(63, 4, 10, 100), 80, "63% -> 0/20/40/60/80")
 eq(axisTop(200, 4, 10, 100), 100, "百分比封顶")
 eq(axisTop(25_000_000, 1024, 1024), 32 * 1024 ** 2, "字节轴按 1024 取整")
 eq(quarters(32 * 1024 ** 2).map(axisBytes), ["0 B", "8 MB", "16 MB", "24 MB", "32 MB"], "四条网格线都是整值")
-eq(quarters(axisTop(2_621_440, 1024, 1024)).map(axisBytes), ["0 B", "1 MB", "2 MB", "3 MB", "4 MB"], "峰值 2.5 MB/s 的四条刻度")
-eq(quarters(axisTop(1_258_291, 1024, 1024)).map(axisBytes), ["0 B", "512 KB", "1 MB", "1.5 MB", "2 MB"], "峰值 1.2 MB/s 的四条刻度")
+eq(quarters(axisTop(2_621_440, 1024, 1024)).map(axisBytes), ["0 B", "1 MB", "2 MB", "3 MB", "4 MB"], "峰值 2.5 MB/s")
+eq(quarters(axisTop(1_258_291, 1024, 1024)).map(axisBytes), ["0 B", "512 KB", "1 MB", "1.5 MB", "2 MB"], "峰值 1.2 MB/s")
 for (const max of [3_000, 300_000, 3_000_000, 300_000_000]) {
   const top = axisTop(max, 1024, 1024)
   eq(top > max, true, `${max} B/s 的轴顶不能等于数据本身`)
@@ -39,7 +39,7 @@ for (const max of [3_000, 300_000, 3_000_000, 300_000_000]) {
   const day = 86_400_000
   const to = Date.now()
   const ticks = timeTicks(to - day, to)
-  eq(ticks.length <= 8, true, `24 小时窗最多 8 个刻度（得到 ${ticks.length}）`)
+  eq(ticks.length <= 8, true, `24 小时窗最多 8 个刻度`)
   eq(ticks.every((t) => new Date(t).getMinutes() === 0 && new Date(t).getSeconds() === 0), true, "刻度落在整点上")
   eq(ticks.every((t, i) => i === 0 || t - ticks[i - 1] === ticks[1] - ticks[0]), true, "刻度间距均匀")
   eq(timeTicks(to, to - day), [], "反向区间不产出刻度")

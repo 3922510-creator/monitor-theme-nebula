@@ -2,7 +2,6 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-// Neon card shell: hover lifts the card and casts a cyan / violet glow.
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

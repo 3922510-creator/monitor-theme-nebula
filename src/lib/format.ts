@@ -40,7 +40,6 @@ export function uptime(seconds: number): string {
   return d > 0 ? `${d} 天 ${h} 小时` : h > 0 ? `${h} 小时 ${m} 分` : `${m} 分`
 }
 
-/** Whole days until a date, negative once it has passed. */
 export function daysUntil(date?: string | null): number | null {
   if (!date) return null
   const target = new Date(`${date}T00:00:00`).getTime()
