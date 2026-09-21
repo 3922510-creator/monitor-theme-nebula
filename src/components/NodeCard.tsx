@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowDown, ArrowUp, ArrowDownUp, Activity, Cpu, HardDrive, MemoryStick, RefreshCw,
 } from "lucide-react"
@@ -30,7 +30,6 @@ function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
-/** Pixel sparkline — row of mini blocks whose height tracks values. */
 function BlockSpark({ values, color, max }: { values: number[]; color: string; max?: number }) {
   if (!values.length) return <div className="flex h-3.5 items-end gap-[2px]" />
   const top = max ?? Math.max(...values, 1)
@@ -47,7 +46,6 @@ function BlockSpark({ values, color, max }: { values: number[]; color: string; m
   )
 }
 
-/* ---- Ping data types ---- */
 type PingPoint = {
   task_id: number
   ts: number
@@ -56,21 +54,31 @@ type PingPoint = {
 }
 type PingData = { ping: PingPoint[]; probes: Record<string, string>; loss?: Record<string, number> }
 
-/** Fetch 24h ping history for per-probe heatmap. */
 function usePing24h(nodeId: number, enabled: boolean) {
   const [data, setData] = useState<PingData | null>(null)
   useEffect(() => {
     if (!enabled) return
     let active = true
-    api<PingData>(`/nodes/${nodeId}/metrics?hours=24&points=288&series=ping`)
-      .then((d) => { if (active) setData(d) })
-      .catch(() => { if (active) setData({ ping: [], probes: {} }) })
-    return () => { active = false }
+    let attempt = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const load = () => {
+      api<PingData>(`/nodes/${nodeId}/metrics?hours=24&points=288&series=ping`)
+        .then((d) => { if (active) setData(d) })
+        .catch(() => {
+          if (!active) return
+          if (++attempt < 3) {
+            timer = setTimeout(load, 3000)
+          } else {
+            setData({ ping: [], probes: {} })
+          }
+        })
+    }
+    load()
+    return () => { active = false; if (timer) clearTimeout(timer) }
   }, [nodeId, enabled])
   return data
 }
 
-/** Latency → block color: <80 green, <150 yellow, <250 orange, else red. */
 function latColor(lat: number | null): string {
   if (lat === null) return "bg-slate-200 dark:bg-slate-700"
   if (lat < 80) return "bg-emerald-400"
@@ -79,7 +87,6 @@ function latColor(lat: number | null): string {
   return "bg-red-400"
 }
 
-/** Loss → block color: <1% green, <5% yellow, <10% orange, else red. */
 function lossColor(loss: number | null): string {
   if (loss === null) return "bg-slate-200 dark:bg-slate-700"
   if (loss < 1) return "bg-emerald-400"
@@ -88,7 +95,6 @@ function lossColor(loss: number | null): string {
   return "bg-red-400"
 }
 
-/** Average latency text color. */
 function latText(lat: number): string {
   if (lat < 80) return "text-emerald-600"
   if (lat < 150) return "text-yellow-600"
@@ -96,7 +102,6 @@ function latText(lat: number): string {
   return "text-red-600"
 }
 
-/** Average loss text color. */
 function lossText(loss: number): string {
   if (loss < 1) return "text-emerald-600"
   if (loss < 5) return "text-yellow-600"
@@ -104,12 +109,11 @@ function lossText(loss: number): string {
   return "text-red-600"
 }
 
-/** Build 24 hourly buckets from ping points for a single probe. */
 function buildHourly(probePoints: PingPoint[]) {
   const byHour = new Map<number, { lat: number; latN: number; loss: number; lossN: number }>()
   for (const p of probePoints) {
     const hour = Math.floor(p.ts / 3600) * 3600
-    const row = byHour.get(hour) ?? { lat: 0, latN: 0; loss: 0, lossN: 0 }
+    const row = byHour.get(hour) ?? { lat: 0, latN: 0, loss: 0, lossN: 0 }
     if (p.latency !== null) { row.lat += p.latency; row.latN++ }
     row.loss += p.loss ?? 0
     row.lossN++
@@ -117,7 +121,7 @@ function buildHourly(probePoints: PingPoint[]) {
   }
   const nowHour = Math.floor(Date.now() / 1000 / 3600) * 3600
   const hours: { ts: number; lat: number | null; loss: number | null }[] = []
-  for (let i = 23; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const ts = nowHour - i * 3600
     const row = byHour.get(ts)
     hours.push({
@@ -135,7 +139,6 @@ function buildHourly(probePoints: PingPoint[]) {
   }
 }
 
-/** Per-probe 24h heatmap row — no card border, plain rows like traffic. */
 function ProbeHeatmap({ name, points }: { name: string; points: PingPoint[] }) {
   const h = useMemo(() => buildHourly(points), [points])
   if (!points.length) return null
@@ -153,10 +156,10 @@ function ProbeHeatmap({ name, points }: { name: string; points: PingPoint[] }) {
       <div className="mt-1.5 flex items-center gap-2">
         <span className="w-8 shrink-0 text-xs text-sky-600 dark:text-sky-400">延迟</span>
         <div className="flex flex-1 gap-[2px]">
-          {h.hours.map((x, i) => (
+          {h.hours.slice(0, 12).map((x, i) => (
             <div
               key={i}
-              className={cn("h-3 w-full flex-1 rounded-[1px]", latColor(x.lat))}
+              className={cn("h-3.5 w-full flex-1 rounded-[1px]", latColor(x.lat))}
             />
           ))}
         </div>
@@ -164,10 +167,10 @@ function ProbeHeatmap({ name, points }: { name: string; points: PingPoint[] }) {
       <div className="mt-1 flex items-center gap-2">
         <span className="w-8 shrink-0 text-xs text-violet-600 dark:text-violet-400">丢包</span>
         <div className="flex flex-1 gap-[2px]">
-          {h.hours.map((x, i) => (
+          {h.hours.slice(0, 12).map((x, i) => (
             <div
               key={i}
-              className={cn("h-3 w-full flex-1 rounded-[1px]", lossColor(x.loss))}
+              className={cn("h-3.5 w-full flex-1 rounded-[1px]", lossColor(x.loss))}
             />
           ))}
         </div>
@@ -176,9 +179,10 @@ function ProbeHeatmap({ name, points }: { name: string; points: PingPoint[] }) {
   )
 }
 
-/** Line status section: header (only when probes exist) + per-probe heatmap rows. */
 function NetworkSection({ node }: { node: Node }) {
   const data = usePing24h(node.id, !!node.metrics)
+  const [atBottom, setAtBottom] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const groups = useMemo(() => {
     if (!data?.ping?.length) return [] as { id: number; name: string; points: PingPoint[] }[]
     const byId = new Map<number, PingPoint[]>()
@@ -194,6 +198,14 @@ function NetworkSection({ node }: { node: Node }) {
     }))
   }, [data])
 
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 2)
+  }
+
+  useEffect(() => { onScroll() }, [groups])
+
   const m = node.metrics
 
   return (
@@ -201,7 +213,8 @@ function NetworkSection({ node }: { node: Node }) {
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Activity className="size-3.5" />
-          线路状态
+          线路
+          <span className="ml-1 text-[10px] font-normal text-muted-foreground/60">格/1H·TCP</span>
         </span>
         {m && (
           <span className="tnum text-xs text-muted-foreground">
@@ -209,9 +222,10 @@ function NetworkSection({ node }: { node: Node }) {
           </span>
         )}
       </div>
-      {/* Fixed-height list: show 2 rows, scroll if more, hide scrollbar. */}
       <div className="relative mt-1.5">
         <div
+          ref={scrollRef}
+          onScroll={onScroll}
           className="space-y-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           style={{ maxHeight: "140px" }}
         >
@@ -223,8 +237,7 @@ function NetworkSection({ node }: { node: Node }) {
             ))
           )}
         </div>
-        {/* Fade + chevron hint when content overflows */}
-        {groups.length > 2 && (
+        {groups.length > 2 && !atBottom && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-6 items-end justify-center bg-linear-to-t from-card to-transparent">
             <svg className="size-3 text-muted-foreground/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M6 9l6 6 6-6" />
@@ -247,7 +260,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
 
   return (
     <Card className="flex h-full min-w-0 flex-col gap-0 p-5">
-      {/* Header: status dot + node name (clickable) + remark tag + expiry days */}
       <div className="flex items-start justify-between">
         <div className="flex min-w-0 items-center gap-2">
           <span
@@ -256,6 +268,11 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               node.online ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600",
             )}
           />
+          {node.country && (
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {node.country}
+            </span>
+          )}
           <h3
             onClick={onOpen}
             className="cursor-pointer truncate font-semibold transition-colors hover:text-primary"
@@ -276,16 +293,19 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
           if (days === null) return null
           return (
             <span className={cn(
-              "tnum shrink-0 text-xs font-medium",
-              days < 0 ? "text-red-500" : days <= 30 ? "text-amber-500" : "text-muted-foreground",
+              "tnum shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold",
+              days < 0
+                ? "bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400"
+                : days <= 30
+                  ? "bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400"
+                  : "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400",
             )}>
-              {days < 0 ? `已过期${-days}天` : `${days}天后到期`}
+              {days < 0 ? `已过期${-days}天` : `${days}天`}
             </span>
           )
         })()}
       </div>
 
-      {/* OS line */}
       <p className="mt-1 truncate text-xs text-muted-foreground">
         {node.os ? osName(node.os) : "等待首次上报"}
         {node.arch ? ` · ${node.arch}` : ""}
@@ -294,38 +314,54 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
 
       {deployed(node) ? (
         <>
-          {/* CPU / Memory / Disk / Load */}
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
             <Meter
               label={`CPU · ${node.cpu_cores} 核`}
               icon={<Cpu className="size-3" />}
               pct={m ? m.cpu : null}
+              foot={m ? `load ${m.load[0].toFixed(2)} / ${m.load[1].toFixed(2)} / ${m.load[2].toFixed(2)}` : undefined}
               color="bg-blue-400"
             />
             <Meter
               label="内存"
               icon={<MemoryStick className="size-3" />}
               pct={m ? percent(m.mem_used, m.mem_total) : null}
+              foot={m ? `${bytes(m.mem_used)} / ${bytes(m.mem_total)}` : undefined}
               color="bg-violet-400"
             />
             <Meter
               label="磁盘"
               icon={<HardDrive className="size-3" />}
               pct={m ? percent(m.disk_used, m.disk_total) : null}
+              foot={m ? `${bytes(m.disk_used)} / ${bytes(m.disk_total)}` : undefined}
               color="bg-orange-400"
             />
             <Meter
-              label="负载"
-              icon={<RefreshCw className="size-3" />
-              pct={m && node.cpu_cores > 0 ? Math.min(100, (m.load[0] / node.cpu_cores) * 100) : null}
+              label="Swap"
+              icon={<RefreshCw className="size-3" />}
+              pct={m && m.swap_total > 0 ? percent(m.swap_used, m.swap_total) : null}
+              foot={m && m.swap_total > 0 ? `${bytes(m.swap_used)} / ${bytes(m.swap_total)}` : undefined}
+              empty={m ? "无" : "—"}
               color="bg-sky-400"
             />
           </div>
 
-          {/* Network throughput section header + sparkline */}
-          <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <ArrowDownUp className="size-3.5" />
-            网络
+          <div className="mt-3 border-t border-border/60" />
+
+          <div className="mt-3 flex items-center justify-between gap-1.5 text-xs font-medium text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <ArrowDownUp className="size-3.5" />
+              网络
+            </span>
+            <span className="tnum flex items-center gap-2 text-[10px] font-normal text-muted-foreground/70">
+              <span className="flex items-center gap-0.5">
+                <ArrowUp className="size-2.5 text-emerald-500" />{bytes(node.day_tx)}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <ArrowDown className="size-2.5 text-blue-500" />{bytes(node.day_rx)}
+              </span>
+              /日
+            </span>
           </div>
           <div className="mt-1.5 grid grid-cols-2 gap-x-4">
             <div>
@@ -333,9 +369,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
                 <ArrowUp className="size-3 shrink-0 text-emerald-500" />
                 <span className="tnum text-sm font-bold text-emerald-600">
                   {m ? rate(m.net_tx) : "—"}
-                </span>
-                <span className="tnum text-xs text-muted-foreground">
-                  {bytes(node.day_tx)}
                 </span>
               </div>
               <div className="mt-1">
@@ -348,9 +381,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
                 <span className="tnum text-sm font-bold text-blue-600">
                   {m ? rate(m.net_rx) : "—"}
                 </span>
-                <span className="tnum text-xs text-muted-foreground">
-                  {bytes(node.day_rx)}
-                </span>
               </div>
               <div className="mt-1">
                 <BlockSpark values={rxHist} color="bg-blue-400/60" max={sparkMax} />
@@ -358,36 +388,40 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             </div>
           </div>
 
-          {/* Traffic usage — used/total next to label */}
-          {node.traffic_limit > 0 && (
-            <div className="mt-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <ArrowDownUp className="size-3" />
-                  流量
-                  <span className="tnum ml-1 text-xs text-muted-foreground/70">
-                    {bytes(monthUsage(node))} / {bytes(node.traffic_limit)}
-                  </span>
+          <div className="mt-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <ArrowDownUp className="size-3" />
+                流量
+                <span className="tnum ml-1 text-xs text-muted-foreground/70">
+                  {bytes(monthUsage(node))} / {node.traffic_limit > 0 ? bytes(node.traffic_limit) : "∞"}
                 </span>
+              </span>
+              {node.traffic_limit > 0 ? (
                 <span className="tnum text-xs font-semibold text-foreground">
                   {trafficPct !== null ? `${trafficPct < 10 ? trafficPct.toFixed(1) : trafficPct.toFixed(0)}%` : "—"}
                 </span>
-              </div>
-              <div className="mt-1.5 flex gap-[3px]">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "h-2 flex-1 rounded-[2px] transition-colors duration-500",
-                      i < Math.round((trafficPct ?? 0) / 5) ? "bg-pink-400" : "bg-slate-200 dark:bg-slate-700",
-                    )}
-                  />
-                ))}
-              </div>
+              ) : (
+                <span className="tnum text-xs text-muted-foreground">∞</span>
+              )}
             </div>
-          )}
+            <div className="mt-1.5 flex gap-[3px]">
+              {Array.from({ length: 20 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "h-2 flex-1 rounded-[2px] transition-colors duration-500",
+                    node.traffic_limit <= 0 || i < Math.round((trafficPct ?? 0) / 5)
+                      ? "bg-pink-400"
+                      : "bg-slate-200 dark:bg-slate-700",
+                  )}
+                />
+              ))}
+            </div>
+          </div>
 
-          {/* Network section (header + per-probe 24h heatmaps) — hidden when no probes */}
+          <div className="mt-3 border-t border-border/60" />
+
           <NetworkSection node={node} />
         </>
       ) : (
@@ -399,7 +433,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
   )
 }
 
-/** Country badge (used by detail page). */
 export function Country({ node }: { node: Node }) {
   if (!node.country) return null
   return (
@@ -409,7 +442,6 @@ export function Country({ node }: { node: Node }) {
   )
 }
 
-/** Online/offline status badge (used by detail page). */
 export function Status({ node }: { node: Node }) {
   const down = node.last_seen ? Date.now() / 1000 - node.last_seen : 0
   const label = node.online
@@ -419,7 +451,8 @@ export function Status({ node }: { node: Node }) {
       : "未接入"
   return (
     <Badge
-      variant="outline" className={cn("tnum shrink-0 gap-1.5 font-normal", !node.online && "text-muted-foreground")}
+      variant="outline"
+      className={cn("tnum shrink-0 gap-1.5 font-normal", !node.online && "text-muted-foreground")}
     >
       <span className={cn("size-1.5 rounded-full", node.online ? "bg-emerald-500" : "bg-muted-foreground/40")} />
       {label.trim()}
