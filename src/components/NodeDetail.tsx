@@ -150,9 +150,7 @@ export function NodeDetail({ node }: { node: Node }) {
         .map((id) => {
           const points = (data?.ping ?? []).filter((p) => p.task_id === id)
           const loss = data?.loss?.[id] ?? 0
-          const lats = points.filter((p) => p.latency !== null).map((p) => p.latency!)
-          const avgLat = lats.length ? lats.reduce((a, b) => a + b, 0) / lats.length : 0
-          return { id, name: data?.probes?.[id] ?? `探测 ${id}`, points, loss, avgLat }
+          return { id, name: data?.probes?.[id] ?? `探测 ${id}`, points, loss }
         })
         .filter((s) => s.points.length > 0),
     [data],

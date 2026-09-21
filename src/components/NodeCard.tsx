@@ -299,7 +299,6 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               label="负载"
               icon={<RefreshCw className="size-3" />}
               pct={m && node.cpu_cores > 0 ? Math.min(100, (m.load[0] / node.cpu_cores) * 100) : null}
-              foot={m ? m.load[0].toFixed(2) : "—"}
               color="bg-sky-400"
             />
           </div>
@@ -369,7 +368,7 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             </div>
           )}
 
-          {/* Line status section (header + per-probe 24h heatmaps) — hidden when no probes */}
+          {/* Network section (header + per-probe 24h heatmaps) — hidden when no probes */}
           <NetworkSection node={node} />
         </>
       ) : (
