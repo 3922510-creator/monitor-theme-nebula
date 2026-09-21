@@ -120,7 +120,8 @@ export function safeNodes(nodes: Node[]): Node[] {
 }
 
 /**
- * Live node list. Uses the WebSocket the hub pushes every two seconds, falling back to polling if it cannot be established.
+ * Live node list. Uses the WebSocket the hub pushes every two seconds, falling
+ * back to polling if it cannot be established.
  */
 export function useNodes() {
   const [nodes, setNodes] = useState<Node[] | null>(null)
@@ -139,6 +140,7 @@ export function useNodes() {
       setNodes(safe)
       setError(null)
       setClosed(false)
+      if (poll) { clearInterval(poll); poll = null }
     }
 
     const fetchOnce = () =>
@@ -147,6 +149,7 @@ export function useNodes() {
         .catch((e: Error) => {
           setError(e.message)
           if (e instanceof ApiError && e.status === 401) setClosed(true)
+          else poll ??= setInterval(fetchOnce, 5000)
         })
 
     fetchOnce()
