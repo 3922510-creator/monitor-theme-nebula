@@ -103,9 +103,6 @@ export default function App() {
             {me.site_name || "Nebula"}
           </button>
           <div className="flex-1" />
-          <Button variant="ghost" size="sm" asChild className="text-muted-foreground">
-            <a href="/admin/">管理</a>
-          </Button>
           <Button variant="ghost" size="icon" onClick={toggleTheme} title="切换主题">
             {dark ? <Sun /> : <Moon />}
           </Button>
