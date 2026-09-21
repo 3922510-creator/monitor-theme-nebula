@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { median } from "d3-array"
 import {
-  Area, AreaChart, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
+  Area, AreaChart, Brush, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts"
 import {
@@ -124,10 +124,12 @@ export function NodeDetail({ node }: { node: Node }) {
   const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
   const [data, setData] = useState<{ metrics: Point[]; ping: PingPoint[]; probes: Probes; loss?: Loss } | null>(null)
   const [failed, setFailed] = useState("")
+  const [zoom, setZoom] = useState<[number, number] | null>(null)
 
   useEffect(() => {
     let active = true
     setData(null)
+    setZoom(null)
     setFailed("")
     const points = Math.round(globalThis.innerWidth * (globalThis.devicePixelRatio || 1))
     const series = tab === "resources" ? "metrics" : "ping"
@@ -309,14 +311,20 @@ export function NodeDetail({ node }: { node: Node }) {
         ) : (
           <div className="space-y-4">
             {/* Time series chart */}
-            <div className="h-80 w-full text-muted-foreground">
+            <div className="h-72 w-full text-muted-foreground">
               {shownProbes.length === 0 ? (
                 <p className="py-8 text-center text-sm">没有选中任何探测</p>
               ) : (
                 <ResponsiveContainer>
                   <ComposedChart data={pingRows}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                    <XAxis {...timeAxis(pingRows)} />
+                    <XAxis
+                      {...timeAxis(
+                        pingRows,
+                        Math.min(zoom?.[0] ?? 0, pingRows.length - 1),
+                        Math.min(zoom?.[1] ?? pingRows.length - 1, pingRows.length - 1),
+                      )}
+                    />
                     <YAxis unit="ms" width={52} domain={["auto", "auto"]} {...AXIS} />
                     <Tooltip
                       labelFormatter={(ts) => new Date(Number(ts)).toLocaleString("zh-CN")}
@@ -351,6 +359,15 @@ export function NodeDetail({ node }: { node: Node }) {
                         connectNulls={!breakLine}
                       />
                     ))}
+                    <Brush
+                      dataKey="ts"
+                      height={28}
+                      travellerWidth={10}
+                      tickFormatter={clockFor(hours)}
+                      className="fill-muted"
+                      stroke="var(--color-muted-foreground)"
+                      onChange={(r) => setZoom([r.startIndex ?? 0, r.endIndex ?? pingRows.length - 1])}
+                    />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
