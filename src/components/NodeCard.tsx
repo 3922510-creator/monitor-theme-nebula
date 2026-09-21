@@ -194,17 +194,13 @@ function NetworkSection({ node }: { node: Node }) {
     }))
   }, [data])
 
-  if (!groups.length) {
-    return (
-      <div className="mt-3 flex-1 rounded-lg border border-dashed border-border/60 p-3 text-center text-xs text-muted-foreground/60">
-        暂无线路探测
-      </div>
-    )
-  }
   const m = node.metrics
+  // Pad to 3 slots so all cards align; extra slots scroll inside the fixed-height area.
+  const slots = 3
+  const pads = Math.max(0, slots - groups.length)
 
   return (
-    <div className="mt-3 flex-1 space-y-2">
+    <div className="mt-3 flex-1">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Activity className="size-3.5" />
@@ -216,9 +212,22 @@ function NetworkSection({ node }: { node: Node }) {
           </span>
         )}
       </div>
-      {groups.map((g) => (
-        <ProbeHeatmap key={g.id} name={g.name} points={g.points} />
-      ))}
+      {/* Fixed-height list: max 3 rows visible, scroll if more, pad if fewer. */}
+      <div className="mt-1.5 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: "220px" }}>
+        {groups.length === 0 && (
+          <div className="flex h-[68px] items-center justify-center rounded-lg border border-dashed border-border/60 text-xs text-muted-foreground/60">
+            暂无线路探测
+          </div>
+        )}
+        {groups.map((g) => (
+          <ProbeHeatmap key={g.id} name={g.name} points={g.points} />
+        ))}
+        {Array.from({ length: pads }).map((_, i) => (
+          <div key={`pad-${i}`} className="flex h-[68px] items-center justify-center rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground/40">
+            —
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
