@@ -9,14 +9,9 @@ import { api, useNodes, type Node } from "@/lib/api"
 
 type Me = { authed: boolean; github: boolean; site_name: string; public_page: boolean }
 
-// Split out because recharts is most of this bundle and the list page draws no
-// chart. The landing page is 242 kB rather than 629 kB (77 kB gzipped against
-// 188 kB), with the rest fetched immediately after it paints.
 const loadDetail = () => import("@/components/NodeDetail").then((m) => ({ default: m.NodeDetail }))
 const NodeDetail = lazy(loadDetail)
 
-// `/node/{id}` is a real page: it survives a reload, can be linked to, and back
-// leaves the detail view rather than the site.
 function useNodeRoute() {
   const read = () => {
     const match = location.pathname.match(/^\/node\/(\d+)/)
@@ -95,7 +90,6 @@ export default function App() {
     <div className="min-h-svh">
       <header className="sticky top-0 z-10 border-b border-violet-500/15 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6">
-          {/* Neon gradient site title — the way back to the list. */}
           <button
             className="bg-linear-to-r from-cyan-400 via-violet-400 to-pink-400 bg-clip-text font-semibold text-transparent transition-opacity hover:opacity-75"
             onClick={() => go(null)}

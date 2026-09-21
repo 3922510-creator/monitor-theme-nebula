@@ -6,20 +6,13 @@ type Props = {
   pct: number | null
   foot?: ReactNode
   empty?: ReactNode
-  /** Tailwind bg color class for filled blocks, e.g. "bg-blue-400". */
   color?: string
-  /** Optional leading icon. */
   icon?: ReactNode
-  /** Hide the block bar (e.g. for load average which isn't a percentage). */
   noBar?: boolean
 }
 
 const BLOCKS = 20
 
-/**
- * Pixel-block meter: 20 small squares fill up by percentage.
- * Clean light-theme look, no gradients or glows.
- */
 export function Meter({ label, pct, foot, empty = "—", color = "bg-blue-400", icon, noBar = false }: Props) {
   const filled = pct === null ? 0 : Math.min(100, Math.max(0, pct))
   const lit = Math.round((filled / 100) * BLOCKS)

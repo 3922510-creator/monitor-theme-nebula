@@ -1,22 +1,16 @@
-import { AlarmClock, Activity, ArrowDown, ArrowUp, ArrowDownUp, Server } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Activity, ArrowDown, ArrowUp, ArrowDownUp, Server, Gauge } from "lucide-react"
 
-import { Card } from "@/components/ui/card"
 import { speedHistory, type Node } from "@/lib/api"
-import { daysUntil, rate } from "@/lib/format"
+import { bytes, rate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-/** Find the node expiring soonest (and not already expired). */
-function soonestExpiry(nodes: Node[]): { node: Node; days: number } | null {
-  let best: { node: Node; days: number } | null = null
-  for (const n of nodes) {
-    const days = daysUntil(n.expires_at)
-    if (days === null || days < 0) continue
-    if (!best || days < best.days) best = { node: n, days }
-  }
-  return best
+type Stat = {
+  icon: React.ReactNode
+  label: string
+  right: React.ReactNode
 }
 
-/** Compact site-wide summary — wrapped in a card, clean rows. */
 export function Summary({ nodes }: { nodes: Node[] }) {
   const online = nodes.filter((n) => n.online)
   const offline = nodes.length - online.length
@@ -26,63 +20,102 @@ export function Summary({ nodes }: { nodes: Node[] }) {
     null,
   )
   const cpu = busiest?.metrics?.cpu ?? 0
+
+  const totalRx = nodes.reduce((s, n) => s + n.total_rx, 0)
+  const totalTx = nodes.reduce((s, n) => s + n.total_tx, 0)
   const now = speedHistory.at(-1) ?? { rx: 0, tx: 0 }
-  const soon = soonestExpiry(nodes)
+
+  const stats: Stat[] = [
+    {
+      icon: <Gauge className="size-4 text-muted-foreground" />,
+      label: "实时网速",
+      right: (
+        <span className="tnum flex items-center gap-3 text-sm font-semibold">
+          <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+            <ArrowDown className="size-3.5" />{rate(now.rx)}
+          </span>
+          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+            <ArrowUp className="size-3.5" />{rate(now.tx)}
+          </span>
+        </span>
+      ),
+    },
+    {
+      icon: <Server className="size-4 text-muted-foreground" />,
+      label: "节点",
+      right: (
+        <span className="tnum text-sm font-semibold">
+          {online.length} / {nodes.length}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {offline > 0 ? `${offline} 离线` : "全部在线"}
+          </span>
+        </span>
+      ),
+    },
+    {
+      icon: <Activity className="size-4 text-muted-foreground" />,
+      label: "最忙节点",
+      right: (
+        <span className="tnum text-sm font-semibold">
+          {cpu.toFixed(1)}%
+          {busiest && <span className="ml-2 truncate text-xs font-normal text-muted-foreground">{busiest.name}</span>}
+        </span>
+      ),
+    },
+    {
+      icon: <ArrowDownUp className="size-4 text-muted-foreground" />,
+      label: "总流量",
+      right: (
+        <span className="tnum flex items-center gap-3 text-sm font-semibold">
+          <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+            <ArrowDown className="size-3.5" />{bytes(totalRx)}
+          </span>
+          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+            <ArrowUp className="size-3.5" />{bytes(totalTx)}
+          </span>
+        </span>
+      ),
+    },
+  ]
+
+  const StatCard = ({ s, className }: { s: Stat; className?: string }) => (
+    <div className={cn("flex items-center gap-3 rounded-xl border bg-card px-4 py-3", className)}>
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+        {s.icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-muted-foreground">{s.label}</div>
+      </div>
+      <div className="shrink-0">{s.right}</div>
+    </div>
+  )
+
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setIdx((i) => (i + 1) % stats.length), 3000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
-    <Card className="gap-0 p-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-        {/* Online status */}
-        <span className="inline-flex items-center gap-1.5">
-          <Server className="size-3.5" />
-          <span className={cn(
-            "size-1.5 rounded-full",
-            online.length === nodes.length ? "bg-emerald-500" : "bg-amber-500",
-          )} />
-          <span className="tnum font-medium text-foreground">{online.length}/{nodes.length}</span> 在线
-          {offline > 0 && <span className="text-amber-500">· {offline} 离线</span>}
-        </span>
-
-        {/* Busiest node */}
-        {busiest && (
-          <span className="inline-flex items-center gap-1.5">
-            <Activity className="size-3.5" />
-            最忙
-            <span className={cn("tnum font-medium", cpu >= 85 ? "text-red-500" : "text-foreground")}>
-              {cpu.toFixed(1)}%
-            </span>
-            <span className="max-w-[120px] truncate">{busiest.name}</span>
-          </span>
-        )}
-
-        {/* Live throughput */}
-        <span className="inline-flex items-center gap-1.5">
-          <ArrowDownUp className="size-3.5" />
-          <ArrowDown className="size-3 text-blue-500" />
-          <span className="tnum font-medium text-foreground">{rate(now.rx)}</span>
-          <ArrowUp className="size-3 text-emerald-500" />
-          <span className="tnum font-medium text-foreground">{rate(now.tx)}</span>
-        </span>
+    <div>
+      <div className="hidden grid-cols-2 gap-3 md:grid">
+        {stats.map((s, i) => <StatCard key={i} s={s} />)}
       </div>
 
-      {/* Expiry warning — show soonest upcoming expiry */}
-      {soon && soon.days <= 60 && (
-        <div className="mt-2 flex items-center gap-1.5 border-t border-border/60 pt-2 text-xs">
-          <AlarmClock className={cn(
-            "size-3.5",
-            soon.days <= 7 ? "text-red-500" : soon.days <= 30 ? "text-amber-500" : "text-muted-foreground",
-          )} />
-          <span className="truncate">
-            <span className={cn(
-              "font-medium",
-              soon.days <= 7 ? "text-red-500" : soon.days <= 30 ? "text-amber-500" : "text-foreground",
-            )}>
-              {soon.days} 天后到期
-            </span>
-            <span className="text-muted-foreground"> · {soon.node.name}</span>
-          </span>
-        </div>
-      )}
-    </Card>
+      <div className="relative h-[60px] select-none md:hidden" style={{ touchAction: "none" }}>
+        {stats.map((s, i) => (
+          <div
+            key={i}
+            className={cn(
+              "absolute inset-0 transition-opacity duration-500",
+              i === idx ? "opacity-100" : "opacity-0",
+            )}
+          >
+            <StatCard s={s} className="h-full border-0 rounded-xl" />
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

@@ -1,5 +1,4 @@
-/* Nebula — clean light theme.
-   Palette: soft gray ground, white cards, blue / violet / orange accents. */
+/* Nebula — clean light theme. */
 @import "tailwindcss" source(none);
 @source "../index.html";
 @source "../src";
@@ -104,10 +103,19 @@
   body { @apply bg-background text-foreground; }
 }
 
-/* Subtle card shadow */
 body {
   background: var(--background);
 }
 
-/* Tabular figures keep live numbers from shifting as they update. */
 .tnum { font-variant-numeric: tabular-nums; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 18s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

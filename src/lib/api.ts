@@ -27,7 +27,6 @@ export type Node = {
   sort: number
   public: boolean
   online: boolean
-  /** ISO 3166-1 alpha-2, or empty when the hub could not locate the address. */
   country: string
   last_seen: number
   metrics: Metrics | null
@@ -55,7 +54,6 @@ export type Node = {
   month_start: string
   day_rx: number
   day_tx: number
-  /** Panel only. */
   hostname?: string
   ip?: string
   remark?: string
@@ -78,13 +76,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json()
 }
 
-/**
- * Fleet throughput, one sample per push. Two minutes at the hub's push interval.
- */
 const KEEP = 60
 export const speedHistory: { rx: number; tx: number }[] = []
 
-/** Per-node throughput history for the sparkline block on each card. */
 const KEEP_PER_NODE = 30
 export const nodeSpeedHistory = new Map<number, { rx: number; tx: number }[]>()
 
@@ -96,7 +90,6 @@ function sample(nodes: Node[]) {
   })
   if (speedHistory.length > KEEP) speedHistory.shift()
 
-  // Per-node samples for card sparklines
   for (const n of live) {
     const nm = n.metrics
     if (!nm) continue
@@ -107,7 +100,6 @@ function sample(nodes: Node[]) {
   }
 }
 
-/** A malformed report must not remove every other node from the page. */
 export function safeNodes(nodes: Node[]): Node[] {
   const number = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0
   const fields = ["uptime", "cpu", "mem_total", "mem_used", "swap_total", "swap_used", "disk_total", "disk_used",
@@ -119,10 +111,6 @@ export function safeNodes(nodes: Node[]): Node[] {
   })
 }
 
-/**
- * Live node list. Uses the WebSocket the hub pushes every two seconds, falling
- * back to polling if it cannot be established.
- */
 export function useNodes() {
   const [nodes, setNodes] = useState<Node[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -149,7 +137,7 @@ export function useNodes() {
         .catch((e: Error) => {
           setError(e.message)
           if (e instanceof ApiError && e.status === 401) setClosed(true)
-          else poll ??= setInterval(fetchOnce, 5000)
+          else poll ??= setInterval(fetchOnce, 2000)
         })
 
     fetchOnce()
@@ -159,7 +147,7 @@ export function useNodes() {
       try {
         socket = new WebSocket(url)
       } catch {
-        poll ??= setInterval(fetchOnce, 5000)
+        poll ??= setInterval(fetchOnce, 2000)
         return
       }
       socket.onmessage = (event) => {
@@ -172,8 +160,8 @@ export function useNodes() {
       socket.onerror = () => socket?.close()
       socket.onclose = () => {
         if (closed) return
-        poll ??= setInterval(fetchOnce, 5000)
-        retry = setTimeout(connect, 5000)
+        poll ??= setInterval(fetchOnce, 2000)
+        retry = setTimeout(connect, 3000)
       }
     }
     connect()
