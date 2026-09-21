@@ -2,7 +2,7 @@
 
 > 浅色像素方块风 · 干净不刺眼 · monitor 状态面板主题
 
-![preview](https://github.com/3922510-creator/monitor-theme-nebula/releases/latest/download/preview.png)
+![preview](public/preview.png)
 
 Nebula 是 [monitor](https://github.com/monitor-probe/monitor) 的第三方主题，基于 [monitor-theme-default](https://github.com/monitor-probe/monitor-theme-default) 改造。
 
