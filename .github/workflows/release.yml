@@ -16,8 +16,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci
+      - run: npm install
       - run: npm run build
       - run: tar --format=ustar -czf theme.tar.gz dist theme.json
       - run: sha256sum theme.tar.gz | cut -d' ' -f1 | tee theme.tar.gz.sha256
