@@ -109,7 +109,7 @@ function buildHourly(probePoints: PingPoint[]) {
   const byHour = new Map<number, { lat: number; latN: number; loss: number; lossN: number }>()
   for (const p of probePoints) {
     const hour = Math.floor(p.ts / 3600) * 3600
-    const row = byHour.get(hour) ?? { lat: 0, latN: 0, loss: 0, lossN: 0 }
+    const row = byHour.get(hour) ?? { lat: 0, latN: 0; loss: 0, lossN: 0 }
     if (p.latency !== null) { row.lat += p.latency; row.latN++ }
     row.loss += p.loss ?? 0
     row.lossN++
@@ -194,11 +194,17 @@ function NetworkSection({ node }: { node: Node }) {
     }))
   }, [data])
 
-  if (!groups.length) return null
+  if (!groups.length) {
+    return (
+      <div className="mt-3 flex-1 rounded-lg border border-dashed border-border/60 p-3 text-center text-xs text-muted-foreground/60">
+        暂无线路探测
+      </div>
+    )
+  }
   const m = node.metrics
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 flex-1 space-y-2">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Activity className="size-3.5" />
@@ -227,7 +233,7 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
   const trafficPct = node.traffic_limit > 0 ? percent(monthUsage(node), node.traffic_limit) : null
 
   return (
-    <Card className="min-w-0 gap-0 p-5">
+    <Card className="flex h-full min-w-0 flex-col gap-0 p-5">
       {/* Header: status dot + node name (clickable) + remark tag + expiry days */}
       <div className="flex items-start justify-between">
         <div className="flex min-w-0 items-center gap-2">
@@ -400,8 +406,7 @@ export function Status({ node }: { node: Node }) {
       : "未接入"
   return (
     <Badge
-      variant="outline"
-      className={cn("tnum shrink-0 gap-1.5 font-normal", !node.online && "text-muted-foreground")}
+      variant="outline" className={cn("tnum shrink-0 gap-1.5 font-normal", !node.online && "text-muted-foreground")}
     >
       <span className={cn("size-1.5 rounded-full", node.online ? "bg-emerald-500" : "bg-muted-foreground/40")} />
       {label.trim()}
