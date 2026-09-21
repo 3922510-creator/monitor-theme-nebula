@@ -142,13 +142,13 @@ function buildHourly(probePoints: PingPoint[]) {
   }
 }
 
-/** Per-probe 24h heatmap card — matches reference design. */
+/** Per-probe 24h heatmap row — no card border, plain rows like traffic. */
 function ProbeHeatmap({ name, points }: { name: string; points: PingPoint[] }) {
   const h = useMemo(() => buildHourly(points), [points])
   if (!points.length) return null
 
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+    <div>
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-sm font-medium">{name}</span>
         <span className="tnum shrink-0 text-xs text-muted-foreground">
@@ -157,27 +157,35 @@ function ProbeHeatmap({ name, points }: { name: string; points: PingPoint[] }) {
           丢包 <span className={cn("font-semibold", lossText(h.avgLoss))}>{h.avgLoss.toFixed(1)}%</span>
         </span>
       </div>
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-1.5 flex items-center gap-2">
         <span className="w-8 shrink-0 text-xs text-sky-600 dark:text-sky-400">延迟</span>
         <div className="flex flex-1 gap-[2px]">
           {h.hours.map((x, i) => (
-            <div
-              key={i}
-              title={x.lat !== null ? `${hourLabel(x.ts)} · ${Math.round(x.lat)} ms` : `${hourLabel(x.ts)} · 无数据`}
-              className={cn("h-3 flex-1 rounded-[1px] transition-transform hover:scale-y-125", latColor(x.lat))}
-            />
+            <div key={i} className="group relative flex-1">
+              <div
+                className={cn("h-3 w-full rounded-[1px] transition-transform hover:scale-y-125", latColor(x.lat))}
+              />
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-slate-700">
+                {x.lat !== null ? `${hourLabel(x.ts)} · ${Math.round(x.lat)} ms` : `${hourLabel(x.ts)} · 无数据`}
+                <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-900 dark:border-t-slate-700" />
+              </div>
+            </div>
           ))}
         </div>
       </div>
-      <div className="mt-1.5 flex items-center gap-2">
+      <div className="mt-1 flex items-center gap-2">
         <span className="w-8 shrink-0 text-xs text-violet-600 dark:text-violet-400">丢包</span>
         <div className="flex flex-1 gap-[2px]">
           {h.hours.map((x, i) => (
-            <div
-              key={i}
-              title={x.loss !== null ? `${hourLabel(x.ts)} · ${x.loss.toFixed(1)}%` : `${hourLabel(x.ts)} · 无数据`}
-              className={cn("h-3 flex-1 rounded-[1px]", lossColor(x.loss))}
-            />
+            <div key={i} className="group relative flex-1">
+              <div
+                className={cn("h-3 w-full rounded-[1px]", lossColor(x.loss))}
+              />
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-slate-700">
+                {x.loss !== null ? `${hourLabel(x.ts)} · ${x.loss.toFixed(1)}%` : `${hourLabel(x.ts)} · 无数据`}
+                <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-900 dark:border-t-slate-700" />
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -185,8 +193,8 @@ function ProbeHeatmap({ name, points }: { name: string; points: PingPoint[] }) {
   )
 }
 
-/** List of per-probe heatmaps (one card per probe). */
-function PingProbes({ node }: { node: Node }) {
+/** Network section: header (only when probes exist) + per-probe heatmap rows. */
+function NetworkSection({ node }: { node: Node }) {
   const data = usePing24h(node.id, !!node.metrics)
   const groups = useMemo(() => {
     if (!data?.ping?.length) return [] as { id: number; name: string; points: PingPoint[] }[]
@@ -204,8 +212,21 @@ function PingProbes({ node }: { node: Node }) {
   }, [data])
 
   if (!groups.length) return null
+  const m = node.metrics
+
   return (
-    <div className="space-y-2">
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Activity className="size-3.5" />
+          网络
+        </span>
+        {m && (
+          <span className="tnum text-xs text-muted-foreground">
+            在线 {uptime(m.uptime)}
+          </span>
+        )}
+      </div>
       {groups.map((g) => (
         <ProbeHeatmap key={g.id} name={g.name} points={g.points} />
       ))}
@@ -361,21 +382,8 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             </div>
           )}
 
-          {/* Line status header + per-probe 24h heatmaps */}
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Activity className="size-3.5" />
-                线路状态
-              </span>
-              {m && (
-                <span className="tnum text-xs text-muted-foreground">
-                  在线 {uptime(m.uptime)}
-                </span>
-              )}
-            </div>
-            <PingProbes node={node} />
-          </div>
+          {/* Network section (header + per-probe 24h heatmaps) — hidden when no probes */}
+          <NetworkSection node={node} />
         </>
       ) : (
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">

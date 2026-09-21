@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { median } from "d3-array"
 import {
-  Area, AreaChart, Brush, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
+  Area, AreaChart, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts"
 import {
@@ -124,12 +124,10 @@ export function NodeDetail({ node }: { node: Node }) {
   const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
   const [data, setData] = useState<{ metrics: Point[]; ping: PingPoint[]; probes: Probes; loss?: Loss } | null>(null)
   const [failed, setFailed] = useState("")
-  const [zoom, setZoom] = useState<[number, number] | null>(null)
 
   useEffect(() => {
     let active = true
     setData(null)
-    setZoom(null)
     setFailed("")
     const points = Math.round(globalThis.innerWidth * (globalThis.devicePixelRatio || 1))
     const series = tab === "resources" ? "metrics" : "ping"
@@ -211,11 +209,6 @@ export function NodeDetail({ node }: { node: Node }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="truncate text-lg font-medium">{node.name}</h2>
-        {node.remark && (
-          <span className="rounded-full bg-linear-to-r from-blue-50 to-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-600 dark:from-blue-950/50 dark:to-violet-950/50 dark:text-violet-400">
-            {node.remark}
-          </span>
-        )}
         <Country node={node} />
         <Status node={node} />
         {node.agent_version && (
@@ -252,6 +245,14 @@ export function NodeDetail({ node }: { node: Node }) {
           ].join(" · ")}
         />
       </dl>
+
+      {node.remark && (
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-linear-to-r from-blue-50 to-violet-50 px-3 py-1 text-xs font-medium text-violet-600 dark:from-blue-950/50 dark:to-violet-950/50 dark:text-violet-400">
+            {node.remark}
+          </span>
+        </div>
+      )}
 
       <div className="space-y-2 border-t border-violet-500/15 pt-4">
         <div className="flex gap-1">
@@ -308,20 +309,14 @@ export function NodeDetail({ node }: { node: Node }) {
         ) : (
           <div className="space-y-4">
             {/* Time series chart */}
-            <div className="h-72 w-full text-muted-foreground">
+            <div className="h-80 w-full text-muted-foreground">
               {shownProbes.length === 0 ? (
                 <p className="py-8 text-center text-sm">没有选中任何探测</p>
               ) : (
                 <ResponsiveContainer>
                   <ComposedChart data={pingRows}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                    <XAxis
-                      {...timeAxis(
-                        pingRows,
-                        Math.min(zoom?.[0] ?? 0, pingRows.length - 1),
-                        Math.min(zoom?.[1] ?? pingRows.length - 1, pingRows.length - 1),
-                      )}
-                    />
+                    <XAxis {...timeAxis(pingRows)} />
                     <YAxis unit="ms" width={52} domain={["auto", "auto"]} {...AXIS} />
                     <Tooltip
                       labelFormatter={(ts) => new Date(Number(ts)).toLocaleString("zh-CN")}
@@ -356,15 +351,6 @@ export function NodeDetail({ node }: { node: Node }) {
                         connectNulls={!breakLine}
                       />
                     ))}
-                    <Brush
-                      dataKey="ts"
-                      height={28}
-                      travellerWidth={10}
-                      tickFormatter={clockFor(hours)}
-                      className="fill-muted"
-                      stroke="var(--color-muted-foreground)"
-                      onChange={(r) => setZoom([r.startIndex ?? 0, r.endIndex ?? pingRows.length - 1])}
-                    />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
