@@ -30,6 +30,15 @@ function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
+// Country codes come from the hub as ISO 3166-1 alpha-2 values. Regional
+// indicator symbols render as the corresponding flag on modern platforms while
+// keeping the raw code available to screen readers and as a fallback.
+function countryFlag(code: string) {
+  const normalized = code.trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(normalized)) return ""
+  return String.fromCodePoint(...[...normalized].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65))
+}
+
 function BlockSpark({ values, color, max }: { values: number[]; color: string; max?: number }) {
   if (!values.length) return <div className="flex h-3.5 items-end gap-[2px]" />
   const top = max ?? Math.max(...values, 1)
@@ -269,8 +278,12 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             )}
           />
           {node.country && (
-            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {node.country}
+            <span
+              className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-sm leading-none"
+              title={node.country.toUpperCase()}
+              aria-label={`地区 ${node.country.toUpperCase()}`}
+            >
+              {countryFlag(node.country) || node.country.toUpperCase()}
             </span>
           )}
           <h3
@@ -436,8 +449,13 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
 export function Country({ node }: { node: Node }) {
   if (!node.country) return null
   return (
-    <Badge variant="outline" className="shrink-0 font-normal text-muted-foreground">
-      {node.country}
+    <Badge
+      variant="outline"
+      className="shrink-0 font-normal text-muted-foreground"
+      title={node.country.toUpperCase()}
+      aria-label={`地区 ${node.country.toUpperCase()}`}
+    >
+      {countryFlag(node.country) || node.country.toUpperCase()}
     </Badge>
   )
 }
