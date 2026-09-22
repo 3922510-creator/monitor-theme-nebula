@@ -21,14 +21,14 @@ jobs:
       - name: Pack theme
         run: |
           FILES="dist theme.json"
-          [ -f public/preview.png ] && FILES="$FILES public/preview.png"
+          [ -f preview.png ] && FILES="$FILES preview.png"
           tar --format=ustar -czf theme.tar.gz $FILES
       - run: sha256sum theme.tar.gz | cut -d' ' -f1 | tee theme.tar.gz.sha256
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           ASSETS="theme.tar.gz theme.tar.gz.sha256"
-          [ -f public/preview.png ] && ASSETS="$ASSETS public/preview.png"
+          [ -f preview.png ] && ASSETS="$ASSETS preview.png"
           gh release upload "$GITHUB_REF_NAME" $ASSETS --repo "$GITHUB_REPOSITORY" --clobber || \
           gh release create "$GITHUB_REF_NAME" $ASSETS --generate-notes --repo "$GITHUB_REPOSITORY"
         env:

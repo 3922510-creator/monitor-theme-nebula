@@ -2,7 +2,7 @@
 
 > 浅色像素方块风 · 干净不刺眼 · monitor 状态面板主题
 
-![preview](public/preview.png)
+![preview](preview.png)
 
 Nebula 是 [monitor](https://github.com/monitor-probe/monitor) 的第三方主题，基于 [monitor-theme-default](https://github.com/monitor-probe/monitor-theme-default) 改造。
 
@@ -11,7 +11,7 @@ Nebula 是 [monitor](https://github.com/monitor-probe/monitor) 的第三方主�
 ## 特性
 
 ### 🖥 节点卡片
-- 状态点 + 国旗地区标签 + 节点名 + 备注胶囊
+- 状态点 + 地区代码标签 + 节点名 + 备注胶囊
 - 右上角到期天数彩色小框（红 ≤7 天 / 黄 ≤30 天 / 绿 >30 天）
 - CPU / 内存 / 磁盘 / Swap 方块条，带真实用量小字（如 `3.54 / 15.62 GB`）
 - CPU 下方 load 1/5/15 分钟小字

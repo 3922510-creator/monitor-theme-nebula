@@ -30,13 +30,11 @@ function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
-// Country codes come from the hub as ISO 3166-1 alpha-2 values. Regional
-// indicator symbols keep the display compact and use the same path for every
-// country, including TW.
+// Country codes come from the hub as ISO 3166-1 alpha-2 values. Display the
+// code itself so platforms cannot turn it into a country-flag emoji.
 function countryFlag(code: string) {
   const normalized = code.trim().toUpperCase()
-  if (!/^[A-Z]{2}$/.test(normalized)) return ""
-  return String.fromCodePoint(...[...normalized].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65))
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : ""
 }
 
 function BlockSpark({ values, color, max }: { values: number[]; color: string; max?: number }) {
