@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowDown, ArrowUp, ArrowDownUp, Activity, Cpu, HardDrive, MemoryStick, RefreshCw,
 } from "lucide-react"
@@ -30,15 +30,12 @@ function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
-// Country codes come from the hub as ISO 3166-1 alpha-2 values. TW is
-// rendered from a bundled SVG because some platforms suppress or do not have
-// a Taiwan emoji glyph. Other codes keep using compact regional indicators.
-function countryFlag(code: string): ReactNode {
+// Country codes come from the hub as ISO 3166-1 alpha-2 values. Regional
+// indicator symbols keep the display compact and use the same path for every
+// country, including TW.
+function countryFlag(code: string) {
   const normalized = code.trim().toUpperCase()
   if (!/^[A-Z]{2}$/.test(normalized)) return ""
-  if (normalized === "TW") {
-    return <img src="/flags/tw.svg" alt="TW" className="inline-block h-[1em] w-[1.4em] object-cover align-[-0.12em]" />
-  }
   return String.fromCodePoint(...[...normalized].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65))
 }
 
