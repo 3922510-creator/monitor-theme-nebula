@@ -11,7 +11,7 @@ type Stat = {
   right: React.ReactNode
 }
 
-export function Summary({ nodes }: { nodes: Node[] }) {
+export function Summary({ nodes, group = null }: { nodes: Node[]; group?: string | null }) {
   const online = nodes.filter((n) => n.online)
   const offline = nodes.length - online.length
 
@@ -23,7 +23,9 @@ export function Summary({ nodes }: { nodes: Node[] }) {
 
   const totalRx = nodes.reduce((s, n) => s + n.total_rx, 0)
   const totalTx = nodes.reduce((s, n) => s + n.total_tx, 0)
-  const now = speedHistory.at(-1) ?? { rx: 0, tx: 0 }
+  // The key holds that scope's throughput -- null the whole fleet, else the
+  // group tab -- and its last point is the sample that arrived with this list.
+  const now = speedHistory.get(group)?.at(-1) ?? { rx: 0, tx: 0 }
 
   const stats: Stat[] = [
     {

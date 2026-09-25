@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils"
 
 function monthUsage(node: Node): number {
+  if (typeof node.month_used === "number") return node.month_used
   const { month_rx: rx, month_tx: tx } = node
   switch (node.traffic_mode) {
     case "up":
@@ -30,12 +31,20 @@ function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
-// Country codes come from the hub as ISO 3166-1 alpha-2 values. Display the
-// code itself so platforms cannot turn it into a country-flag emoji.
-function countryFlag(code: string) {
-  const normalized = code.trim().toUpperCase()
-  return /^[A-Z]{2}$/.test(normalized) ? normalized : ""
-}
+// Emitted as files and fetched on first use, so a page carries only the flags its
+// nodes are in rather than all 267. vite.config.ts keeps them from being inlined
+// into the bundle as data URLs. The simplified set, because this theme is
+// embedded in the hub binary: flag-icons' detailed emblems total 1.95 MiB against
+// 174 KiB here, a difference invisible at 18 by 12 pixels.
+const FLAGS = Object.fromEntries(
+  Object.entries(
+    import.meta.glob<string>("/node_modules/country-flag-icons/3x2/*.svg", {
+      query: "?url",
+      import: "default",
+      eager: true,
+    }),
+  ).map(([path, url]) => [path.match(/([\w-]+)\.svg$/)![1], url]),
+)
 
 function BlockSpark({ values, color, max }: { values: number[]; color: string; max?: number }) {
   if (!values.length) return <div className="flex h-3.5 items-end gap-[2px]" />
@@ -275,15 +284,7 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               node.online ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600",
             )}
           />
-          {node.country && (
-            <span
-              className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-sm leading-none"
-              title={node.country.toUpperCase()}
-              aria-label={`地区 ${node.country.toUpperCase()}`}
-            >
-              {countryFlag(node.country) || node.country.toUpperCase()}
-            </span>
-          )}
+          <Country node={node} />
           <h3
             onClick={onOpen}
             className="cursor-pointer truncate font-semibold transition-colors hover:text-primary"
@@ -300,8 +301,8 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
           )}
         </div>
         {(() => {
-          const days = daysUntil(node.expires_at)
-          if (days === null) return null
+          const days = node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
+          if (days === null || days === undefined) return null
           return (
             <span className={cn(
               "tnum shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold",
@@ -446,15 +447,22 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
 
 export function Country({ node }: { node: Node }) {
   if (!node.country) return null
+  const code = node.country.trim().toUpperCase()
+  const src = FLAGS[code]
+  if (!src) {
+    return (
+      <Badge variant="outline" className="shrink-0 font-normal text-muted-foreground">
+        {code}
+      </Badge>
+    )
+  }
   return (
-    <Badge
-      variant="outline"
-      className="shrink-0 font-normal text-muted-foreground"
-      title={node.country.toUpperCase()}
-      aria-label={`地区 ${node.country.toUpperCase()}`}
-    >
-      {countryFlag(node.country) || node.country.toUpperCase()}
-    </Badge>
+    <img
+      src={src}
+      alt={code}
+      title={code}
+      className="h-3 w-4.5 shrink-0 rounded-[2px] ring-1 ring-foreground/10"
+    />
   )
 }
 

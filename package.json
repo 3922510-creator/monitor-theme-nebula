@@ -1,7 +1,7 @@
 {
   "name": "monitor-theme-nebula",
   "private": true,
-  "version": "1.0.8",
+  "version": "1.0.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +14,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "country-flag-icons": "^1.6.20",
     "d3-array": "^3.2.4",
     "lucide-react": "^1.34.0",
     "radix-ui": "^1.6.7",

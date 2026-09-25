@@ -27,7 +27,10 @@ export type Node = {
   sort: number
   public: boolean
   online: boolean
+  /** ISO 3166-1 alpha-2, or empty when the hub could not locate the address. */
   country: string
+  /** Set by the operator; empty is ungrouped. Absent from a hub predating groups. */
+  group?: string
   last_seen: number
   metrics: Metrics | null
   os: string
@@ -44,6 +47,11 @@ export type Node = {
   currency: string
   billing_cycle: string
   expires_at: string | null
+  /**
+   * Days until `expires_at` on the hub's calendar, negative once past, null
+   * without a date. Absent on older hubs.
+   */
+  expires_in?: number | null
   traffic_limit: number
   traffic_mode: string
   traffic_reset_day: number
@@ -51,12 +59,19 @@ export type Node = {
   total_tx: number
   month_rx: number
   month_tx: number
+  /** This period's usage as the plan meters it (`traffic_mode`). Absent on older hubs. */
+  month_used?: number
   month_start: string
   day_rx: number
   day_tx: number
   hostname?: string
   ip?: string
   remark?: string
+}
+
+/** Every group in use, in the order of the first node carrying it: the operator's node order decides the tab order. */
+export function groupsOf(nodes: Pick<Node, "group">[]): string[] {
+  return [...new Set(nodes.map((n) => n.group ?? "").filter(Boolean))]
 }
 
 export class ApiError extends Error {
@@ -76,28 +91,58 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json()
 }
 
+/**
+ * Throughput, one sample per push, as a series for every node (null) and one per
+ * group ("" for the ungrouped), so the summary above a group tab draws that
+ * group's line rather than the fleet's. Held beside the stream that feeds it
+ * rather than in the tile that draws it: the summary unmounts while a node page
+ * is open, so a buffer held there would restart empty on every return. Two
+ * minutes at the hub's push interval; a group no node carries any more is
+ * dropped. Keyed null rather than by any string, since a group may be named
+ * anything, "*" included.
+ */
 const KEEP = 60
-export const speedHistory: { rx: number; tx: number }[] = []
+export const speedHistory = new Map<string | null, { rx: number; tx: number }[]>()
 
+// Per-node throughput history, for the sparkline on each card. Shorter than the
+// summary's window: a card draws roughly twenty bars, so thirty samples keep it
+// fed without holding a fleet's worth of arrays longer than they are drawn.
 const KEEP_PER_NODE = 30
 export const nodeSpeedHistory = new Map<number, { rx: number; tx: number }[]>()
 
-function sample(nodes: Node[]) {
-  const live = nodes.filter((n) => n.online && n.metrics)
-  speedHistory.push({
-    rx: live.reduce((s, n) => s + n.metrics!.net_rx, 0),
-    tx: live.reduce((s, n) => s + n.metrics!.net_tx, 0),
-  })
-  if (speedHistory.length > KEEP) speedHistory.shift()
+export function sample(nodes: Node[]) {
+  const totals = new Map<string | null, { rx: number; tx: number }>()
+  for (const n of nodes) {
+    for (const key of [null, n.group ?? ""]) {
+      const total = totals.get(key) ?? { rx: 0, tx: 0 }
+      if (n.online && n.metrics) {
+        total.rx += n.metrics.net_rx
+        total.tx += n.metrics.net_tx
+      }
+      totals.set(key, total)
+    }
+  }
+  for (const key of speedHistory.keys()) if (!totals.has(key)) speedHistory.delete(key)
+  for (const [key, total] of totals) {
+    const series = speedHistory.get(key) ?? []
+    series.push(total)
+    if (series.length > KEEP) series.shift()
+    speedHistory.set(key, series)
+  }
 
-  for (const n of live) {
-    const nm = n.metrics
-    if (!nm) continue
+  // Per-node series alongside the group totals: an online node contributes its
+  // own throughput; a node that has gone away is dropped so its array is not
+  // held for the life of the page.
+  const live = new Set<number>()
+  for (const n of nodes) {
+    if (!n.online || !n.metrics) continue
+    live.add(n.id)
     const hist = nodeSpeedHistory.get(n.id) ?? []
-    hist.push({ rx: nm.net_rx, tx: nm.net_tx })
+    hist.push({ rx: n.metrics.net_rx, tx: n.metrics.net_tx })
     if (hist.length > KEEP_PER_NODE) hist.shift()
     nodeSpeedHistory.set(n.id, hist)
   }
+  for (const id of nodeSpeedHistory.keys()) if (!live.has(id)) nodeSpeedHistory.delete(id)
 }
 
 export function safeNodes(nodes: Node[]): Node[] {
