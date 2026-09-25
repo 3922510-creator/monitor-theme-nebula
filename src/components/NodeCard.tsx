@@ -27,7 +27,9 @@ function monthUsage(node: Node): number {
   }
 }
 
-function deployed(node: Node) {
+// A node that has ever reported hardware is deployed; one that never did is
+// still waiting for its agent.
+export function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
@@ -281,7 +283,11 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
           <span
             className={cn(
               "size-2 shrink-0 rounded-full",
-              node.online ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600",
+              node.online
+                ? "bg-emerald-500 shadow-[0_0_0_3px] shadow-emerald-500/20"
+                : deployed(node)
+                  ? "bg-red-500 shadow-[0_0_0_3px] shadow-red-500/20 dark:bg-red-400"
+                  : "bg-muted-foreground/40",
             )}
           />
           <Country node={node} />
@@ -466,20 +472,3 @@ export function Country({ node }: { node: Node }) {
   )
 }
 
-export function Status({ node }: { node: Node }) {
-  const down = node.last_seen ? Date.now() / 1000 - node.last_seen : 0
-  const label = node.online
-    ? `在线 ${node.metrics ? uptime(node.metrics.uptime) : ""}`
-    : node.cpu_cores > 0 || node.mem_total > 0
-      ? `离线 ${down >= 60 ? uptime(down) : ""}`
-      : "未接入"
-  return (
-    <Badge
-      variant="outline"
-      className={cn("tnum shrink-0 gap-1.5 font-normal", !node.online && "text-muted-foreground")}
-    >
-      <span className={cn("size-1.5 rounded-full", node.online ? "bg-emerald-500" : "bg-muted-foreground/40")} />
-      {label.trim()}
-    </Badge>
-  )
-}
