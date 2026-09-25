@@ -8,13 +8,13 @@ import {
   ArrowDownUp, Cpu, HardDrive, MemoryStick, Server, Wallet,
 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Country, Status } from "@/components/NodeCard"
+import { Country } from "@/components/NodeCard"
 import { api, type Node } from "@/lib/api"
 import {
-  axisBytes, axisTop, bytes, clockFor, quarters, cpuName, CYCLES, FOREVER, money, osName, rate, timeTicks,
+  axisBytes, axisTop, bytes, clockFor, quarters, cpuName, CYCLES, FOREVER, money, osName, rate, timeTicks, uptime,
 } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 type Point = {
   ts: number
@@ -205,16 +205,27 @@ export function NodeDetail({ node }: { node: Node }) {
     ...AXIS,
   })
 
+  const deployed = node.cpu_cores > 0 || node.mem_total > 0
+  const down = node.last_seen ? Date.now() / 1000 - node.last_seen : 0
+  const statusLabel = node.online
+    ? `在线 ${node.metrics ? uptime(node.metrics.uptime) : ""}`.trim()
+    : deployed
+      ? `离线 ${down >= 60 ? uptime(down) : ""}`.trim()
+      : "未接入"
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="truncate text-lg font-medium">{node.name}</h2>
+      {/* Header one line, same layout as the Lumen theme: flag, name, how long
+          it has been up, the agent it runs. Nebula's own colours. */}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <Country node={node} />
-        <Status node={node} />
+        <h2 className="truncate text-lg font-medium">{node.name}</h2>
+        <span className="inline-flex items-center gap-2 text-sm">
+          <span className={cn("size-2 rounded-full", node.online ? "bg-emerald-500" : "bg-muted-foreground/40")} />
+          <span className={cn("tnum", !node.online && "text-muted-foreground")}>{statusLabel}</span>
+        </span>
         {node.agent_version && (
-          <Badge variant="outline" className="font-normal">
-            agent {node.agent_version}
-          </Badge>
+          <span className="tnum shrink-0 text-xs font-normal text-muted-foreground/70">agent {node.agent_version}</span>
         )}
       </div>
 
